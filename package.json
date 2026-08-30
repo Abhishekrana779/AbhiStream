@@ -1,0 +1,13 @@
+{
+  "name": "abhistream",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix backend\" \"bash -c 'until curl -s http://localhost:5000/api/health > /dev/null; do sleep 1; done; npm run dev --prefix frontend'\"",
+    "backend": "npm run dev --prefix backend",
+    "frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend && npm run build --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

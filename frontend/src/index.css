@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #8b5cf6;
+  --color-primary-hover: #7c3aed;
+  --color-secondary: #ec4899;
+  --color-dark-900: #0a0a12;
+  --color-dark-800: #0f0f1a;
+  --color-dark-700: #16162a;
+  --color-dark-600: #1e1e38;
+  --color-dark-500: #2a2a4a;
+  --font-sans: Inter, system-ui, sans-serif;
+}
+
+@layer components {
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-dark-600) 0%,
+      var(--color-dark-500) 50%,
+      var(--color-dark-600) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  }
+
+  .card {
+    @apply bg-dark-800 border border-dark-700 rounded-xl overflow-hidden;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary to-secondary text-white font-semibold rounded-lg py-2 px-4 shadow-lg shadow-purple-900/30 transition-all duration-200;
+  }
+
+  .btn-primary:hover {
+    @apply brightness-110 shadow-purple-700/40;
+  }
+
+  .btn-primary:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
