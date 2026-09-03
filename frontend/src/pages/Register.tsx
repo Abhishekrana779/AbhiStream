@@ -6,8 +6,7 @@ import ErrorMessage from "../components/ErrorMessage";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register } = useAuth();
-  const { user } = useAuth();
+  const { register, user } = useAuth();
 
   const [formData, setFormData] = useState({
     username: "",
@@ -106,7 +105,7 @@ export default function Register() {
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="text-4xl font-bold text-white mb-2">AbhiStream</div>
+          <div className="text-3xl sm:text-4xl font-bold text-white mb-2 break-words">AbhiStream</div>
           <p className="text-gray-400">Join us to watch anime</p>
         </div>
 

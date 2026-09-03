@@ -30,6 +30,12 @@ export const animeApi = {
   getStreamingSources: (episodeId: string) =>
     apiGet<StreamingData>(`/anime/${episodeId}/streaming`),
 
+  getEpisodeLinks: (animeId: string, episodeNumber: number, category: "sub" | "dub" = "sub") =>
+    apiGet<StreamingData>(`/anime/${animeId}/episodes`, {
+      episode: episodeNumber,
+      category,
+    }),
+
   getGenres: () => apiGet<Genre[]>("/anime/genres"),
 
   getGenreAnime: (genreId: string, page: number = 1) =>

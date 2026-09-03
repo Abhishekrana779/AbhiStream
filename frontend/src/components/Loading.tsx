@@ -21,16 +21,16 @@ function CardSkeleton() {
 
 function HeroSkeleton() {
   return (
-    <div className="relative w-full h-[70vh]">
+    <div className="relative w-full h-[60vh] min-h-[420px] sm:h-[65vh] sm:min-h-[480px] md:h-[70vh]">
       <div className="skeleton absolute inset-0" />
-      <div className="absolute bottom-0 left-0 right-0 p-8 space-y-4">
-        <div className="skeleton h-8 w-1/3 rounded" />
-        <div className="skeleton h-6 w-1/4 rounded" />
+      <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-8 space-y-4">
+        <div className="skeleton h-7 sm:h-8 w-2/3 sm:w-1/3 rounded" />
+        <div className="skeleton h-5 sm:h-6 w-1/2 sm:w-1/4 rounded" />
         <div className="skeleton h-4 w-2/3 rounded" />
         <div className="skeleton h-4 w-1/2 rounded" />
         <div className="flex gap-3 mt-4">
-          <div className="skeleton h-12 w-36 rounded-lg" />
-          <div className="skeleton h-12 w-36 rounded-lg" />
+          <div className="skeleton h-11 sm:h-12 w-32 sm:w-36 rounded-lg" />
+          <div className="skeleton h-11 sm:h-12 w-32 sm:w-36 rounded-lg" />
         </div>
       </div>
     </div>

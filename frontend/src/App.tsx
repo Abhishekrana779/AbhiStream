@@ -21,7 +21,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col">
       <Navbar />
-      <main className="flex-1">
+      <main className="flex-1 pb-20 md:pb-0">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />

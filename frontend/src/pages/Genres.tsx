@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { FiArrowRight } from "react-icons/fi";
+import { FiArrowRight, FiGrid } from "react-icons/fi";
 import { animeApi } from "../services/animeApi";
 import Loading from "../components/Loading";
 import ErrorMessage from "../components/ErrorMessage";
@@ -46,7 +46,7 @@ export default function Genres() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
       <div className="mb-12">
         <h1 className="text-4xl font-bold text-white mb-3">Browse by Genre</h1>
         <p className="text-gray-400 text-lg">
@@ -83,7 +83,7 @@ export default function Genres() {
         </div>
       ) : (
         <div className="text-center py-16">
-          <div className="text-5xl mb-4">🎭</div>
+          <div className="text-5xl mb-4 text-gray-500 flex justify-center"><FiGrid /></div>
           <p className="text-gray-400 text-lg">No genres available</p>
         </div>
       )}

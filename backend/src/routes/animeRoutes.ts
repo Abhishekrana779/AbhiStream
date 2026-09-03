@@ -8,6 +8,7 @@ import {
   searchAnime,
   getAnimeInfo,
   getStreamingSources,
+  getEpisodeLinks,
   getGenres,
   getGenreAnime,
   proxyStream,
@@ -25,6 +26,7 @@ router.get("/search", searchAnime);
 router.get("/genres", getGenres);
 router.get("/genre/:genreId", getGenreAnime);
 router.get("/stream", proxyStream);
+router.get("/:id/episodes", getEpisodeLinks);
 router.get("/:id/streaming", getStreamingSources);
 router.get("/:id", getAnimeInfo);
 

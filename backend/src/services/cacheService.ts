@@ -47,9 +47,9 @@ class CacheService {
   }
 }
 
+export const cache = new CacheService();
+
 // Prune expired entries every 10 minutes
 setInterval(() => {
   cache.prune();
 }, 10 * 60 * 1000);
-
-export const cache = new CacheService();

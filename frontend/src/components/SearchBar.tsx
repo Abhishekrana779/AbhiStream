@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { FiSearch, FiX } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "../hooks/useDebounce";
@@ -19,16 +19,22 @@ export default function SearchBar({
   const debouncedQuery = useDebounce(query, 400);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const firstRender = useRef(true);
 
   useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
 
+  const stableOnSearch = useRef(onSearch);
+  stableOnSearch.current = onSearch;
+
   useEffect(() => {
-    if (onSearch) {
-      onSearch(debouncedQuery);
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
     }
-  }, [debouncedQuery, onSearch]);
+    stableOnSearch.current?.(debouncedQuery);
+  }, [debouncedQuery]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +43,10 @@ export default function SearchBar({
     }
   };
 
-  const clear = () => {
+  const clear = useCallback(() => {
     setQuery("");
     inputRef.current?.focus();
-  };
+  }, []);
 
   return (
     <form onSubmit={handleSubmit} className="relative w-full">

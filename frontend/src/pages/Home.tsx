@@ -62,7 +62,7 @@ export default function Home() {
               <div className="skeleton h-7 w-40 rounded mb-4" />
               <div className="flex gap-4 overflow-hidden">
                 {Array.from({ length: 6 }).map((_, j) => (
-                  <div key={j} className="shrink-0 w-45">
+                  <div key={j} className="shrink-0 w-40 sm:w-44 md:w-52">
                     <div className="skeleton aspect-3/4 rounded-xl" />
                   </div>
                 ))}
@@ -84,16 +84,16 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {trending.length > 0 && (
-          <AnimeCarousel title="🔥 Trending Now" anime={trending} />
+          <AnimeCarousel title="Trending Now" anime={trending} />
         )}
         {popular.length > 0 && (
-          <AnimeCarousel title="⭐ Popular Anime" anime={popular} />
+          <AnimeCarousel title="Popular Anime" anime={popular} />
         )}
         {latest.length > 0 && (
-          <AnimeCarousel title="📺 Latest Episodes" anime={latest} />
+          <AnimeCarousel title="Latest Episodes" anime={latest} />
         )}
         {upcoming.length > 0 && (
-          <AnimeCarousel title="📅 Upcoming Anime" anime={upcoming} />
+          <AnimeCarousel title="Upcoming Anime" anime={upcoming} />
         )}
       </div>
     </div>

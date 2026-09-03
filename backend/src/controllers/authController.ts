@@ -1,6 +1,8 @@
 import { Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import path from "path";
+import fs from "fs/promises";
 import User from "../models/User";
 import Watchlist from "../models/Watchlist";
 import History from "../models/History";
@@ -16,7 +18,7 @@ export async function register(req: AuthRequest, res: Response): Promise<void> {
   try {
     const username = typeof req.body.username === "string" ? req.body.username.trim() : "";
     const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
-    const password = req.body.password;
+    const password = typeof req.body.password === "string" ? req.body.password : "";
 
     if (!username || !email || !password) {
       res
@@ -59,11 +61,28 @@ export async function register(req: AuthRequest, res: Response): Promise<void> {
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-    });
+    let user;
+    try {
+      user = await User.create({
+        username,
+        email,
+        password: hashedPassword,
+      });
+    } catch (createError: unknown) {
+      const err = createError as { code?: number; keyPattern?: Record<string, number> };
+      if (err?.code === 11000) {
+        const field = err.keyPattern?.email
+          ? "email"
+          : err.keyPattern?.username
+            ? "username"
+            : "email or username";
+        res
+          .status(409)
+          .json({ success: false, message: `That ${field} is already registered` });
+        return;
+      }
+      throw createError;
+    }
 
     const payload: AuthPayload = {
       userId: user._id.toString(),
@@ -95,7 +114,7 @@ export async function register(req: AuthRequest, res: Response): Promise<void> {
 export async function login(req: AuthRequest, res: Response): Promise<void> {
   try {
     const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
-    const password = req.body.password;
+    const password = typeof req.body.password === "string" ? req.body.password : "";
 
     if (!email || !password) {
       res
@@ -240,7 +259,8 @@ export async function changePassword(
   res: Response,
 ): Promise<void> {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const currentPassword = typeof req.body.currentPassword === "string" ? req.body.currentPassword : "";
+    const newPassword = typeof req.body.newPassword === "string" ? req.body.newPassword : "";
 
     if (!currentPassword || !newPassword) {
       res
@@ -305,6 +325,50 @@ export async function deleteAccount(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to delete account";
+    res.status(500).json({ success: false, message });
+  }
+}
+
+export async function uploadAvatar(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ success: false, message: "No file uploaded" });
+      return;
+    }
+
+    const user = await User.findById(req.user!.userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+
+    const oldAvatar = user.avatar;
+    if (oldAvatar && oldAvatar.startsWith("/uploads/")) {
+      const relativePath = oldAvatar.startsWith("/") ? oldAvatar.slice(1) : oldAvatar;
+      const oldPath = path.join(process.cwd(), relativePath);
+      fs.unlink(oldPath).catch(() => {});
+    }
+
+    user.avatar = `/uploads/avatars/${file.filename}`;
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to upload avatar";
     res.status(500).json({ success: false, message });
   }
 }

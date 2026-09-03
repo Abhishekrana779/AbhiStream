@@ -54,12 +54,34 @@ export interface StreamingSource {
   url: string;
   isM3U8: boolean;
   quality: string;
+  provider?: string;
+}
+
+export interface StreamingServer {
+  provider: string;
+  label: string;
+  url: string;
+  isM3U8: boolean;
+  quality: string;
+  referer?: string;
+  intro?: StreamingSkipRange;
+  outro?: StreamingSkipRange;
+  working: boolean;
+}
+
+export interface StreamingSkipRange {
+  start: number;
+  end: number;
 }
 
 export interface StreamingData {
   sources: StreamingSource[];
   download: string;
   headers: Record<string, string>;
+  intro?: StreamingSkipRange;
+  outro?: StreamingSkipRange;
+  subtitles?: Array<{ url?: string; file?: string; label?: string; lang?: string }>;
+  servers?: StreamingServer[];
 }
 
 export interface Genre {

@@ -132,7 +132,16 @@ export default function VideoPlayer({ streamingData, poster, autoPlay = true, on
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       const video = videoRef.current;
-      if (!video || document.activeElement?.tagName === "INPUT") return;
+      if (!video) return;
+      const active = document.activeElement;
+      const tag = active?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      ) {
+        return;
+      }
 
       switch (e.key) {
         case " ":
@@ -180,7 +189,7 @@ export default function VideoPlayer({ streamingData, poster, autoPlay = true, on
   }, []);
 
   return (
-    <div className="relative w-full bg-black rounded-xl overflow-hidden aspect-video pl-3 pr-3 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="relative w-full bg-black rounded-xl overflow-hidden aspect-video">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
           <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -189,7 +198,7 @@ export default function VideoPlayer({ streamingData, poster, autoPlay = true, on
 
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 px-4">
-          <p className="text-red-400 text-base sm:text-lg mb-2">⚠️</p>
+          <p className="text-red-400 text-base sm:text-lg mb-2"></p>
           <p className="text-gray-300 text-xs sm:text-sm text-center">{error}</p>
         </div>
       )}

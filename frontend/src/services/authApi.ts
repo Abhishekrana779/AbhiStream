@@ -14,6 +14,12 @@ export const authApi = {
   updateProfile: (data: { username?: string; avatar?: string }) =>
     apiPatch<User>("/auth/profile", data),
 
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return apiPost<User>("/auth/avatar", formData);
+  },
+
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     apiPatch<null>("/auth/password", data),
 

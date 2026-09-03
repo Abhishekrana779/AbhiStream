@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiTrash2, FiPlay, FiCalendar } from "react-icons/fi";
+import { FiTrash2, FiPlay, FiCalendar, FiFilter, FiBookmark } from "react-icons/fi";
 import { watchlistApi } from "../services/watchlistApi";
 import ImageWithFallback from "../components/ImageWithFallback";
 import Loading from "../components/Loading";
@@ -109,7 +109,7 @@ export default function Watchlist() {
   const uniqueStatuses = getUniqueStatuses();
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
@@ -218,7 +218,7 @@ export default function Watchlist() {
         </div>
       ) : (
         <div className="text-center py-16">
-          <div className="text-5xl mb-4">📚</div>
+          <div className="text-5xl mb-4 text-gray-500 flex justify-center"><FiBookmark /></div>
           <p className="text-gray-400 text-lg mb-6">Your watchlist is empty</p>
           <button onClick={() => navigate("/")} className="btn-primary">
             Start Exploring
@@ -229,7 +229,7 @@ export default function Watchlist() {
       {/* No Results for Filter */}
       {watchlist.length > 0 && filteredWatchlist.length === 0 && (
         <div className="text-center py-16">
-          <div className="text-5xl mb-4">🔍</div>
+          <div className="text-5xl mb-4 text-gray-500 flex justify-center"><FiFilter /></div>
           <p className="text-gray-400 text-lg mb-6">
             No anime found with status "{statusFilter}"
           </p>

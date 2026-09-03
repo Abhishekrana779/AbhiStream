@@ -5,6 +5,7 @@ import type { AuthPayload } from "../types";
 
 export interface AuthRequest extends Request {
   user?: AuthPayload;
+  file?: Express.Multer.File;
 }
 
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {

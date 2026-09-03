@@ -16,7 +16,10 @@ export async function getWatchlist(req: AuthRequest, res: Response): Promise<voi
 
 export async function addToWatchlist(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const { animeId, title, poster, status } = req.body;
+    const animeId = typeof req.body.animeId === "string" ? req.body.animeId : "";
+    const title = typeof req.body.title === "string" ? req.body.title : "";
+    const poster = typeof req.body.poster === "string" ? req.body.poster : "";
+    const status = typeof req.body.status === "string" ? req.body.status : null;
 
     if (!animeId || !title) {
       res.status(400).json({ success: false, message: "Anime ID and title are required" });
@@ -37,8 +40,8 @@ export async function addToWatchlist(req: AuthRequest, res: Response): Promise<v
       userId: req.user!.userId,
       animeId,
       title,
-      poster: poster || "",
-      status: status || null,
+      poster,
+      status,
     });
 
     res.status(201).json({ success: true, data: item });

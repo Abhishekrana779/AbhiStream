@@ -79,9 +79,15 @@ export async function getSpotlight(req: Request, res: Response): Promise<void> {
   }
 }
 
+function firstQuery(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return "";
+}
+
 export async function searchAnime(req: Request, res: Response): Promise<void> {
   try {
-    const q = (req.query.q as string) || "";
+    const q = firstQuery(req.query.q);
     if (!q.trim()) {
       res
         .status(400)
@@ -101,9 +107,9 @@ export async function searchAnime(req: Request, res: Response): Promise<void> {
 
 export async function getAnimeInfo(req: Request, res: Response): Promise<void> {
   try {
-    const { id } = req.params;
-    if (!id) {
-      res.status(400).json({ success: false, message: "Anime ID is required" });
+    const id = firstQuery(req.params.id);
+    if (!id || !/^\d+$/.test(id)) {
+      res.status(400).json({ success: false, message: "Invalid anime id" });
       return;
     }
     const data: AnimeDetails = await miruroClient.getAnimeInfo(id);
@@ -112,6 +118,48 @@ export async function getAnimeInfo(req: Request, res: Response): Promise<void> {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to fetch anime info";
+    const status = /404|not found/i.test(message) ? 404 : 502;
+    res.status(status).json({ success: false, message });
+  }
+}
+
+export async function getEpisodeLinks(req: Request, res: Response): Promise<void> {
+  try {
+    const id = firstQuery(req.params.id);
+    if (!id || !/^\d+$/.test(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid anime id",
+      });
+      return;
+    }
+    const episodeNumberRaw = req.query.episode;
+    const episodeNumber = Number.parseInt(
+      typeof episodeNumberRaw === "string" ? episodeNumberRaw : "",
+      10,
+    );
+    if (Number.isNaN(episodeNumber) || episodeNumber <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "Valid episode number is required",
+      });
+      return;
+    }
+    const categoryRaw = typeof req.query.category === "string" ? req.query.category : "sub";
+    const category: "sub" | "dub" = categoryRaw === "dub" ? "dub" : "sub";
+    const data = await miruroClient.getEpisodeLinks(id, episodeNumber, category);
+    if (data.sources.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: "No sources available for this episode",
+      });
+      return;
+    }
+    const response: ApiResponse<typeof data> = { success: true, data };
+    res.json(response);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch episode links";
     res.status(502).json({ success: false, message });
   }
 }
@@ -121,7 +169,7 @@ export async function getStreamingSources(
   res: Response,
 ): Promise<void> {
   try {
-    const { id } = req.params;
+    const id = firstQuery(req.params.id);
     if (!id) {
       res
         .status(400)
@@ -157,7 +205,7 @@ export async function getGenreAnime(
   res: Response,
 ): Promise<void> {
   try {
-    const { genreId } = req.params;
+    const genreId = firstQuery(req.params.genreId);
     if (!genreId) {
       res.status(400).json({ success: false, message: "Genre ID is required" });
       return;
@@ -183,15 +231,61 @@ function isPlaylist(target: string, contentType?: string): boolean {
   );
 }
 
+function isSafeProxyTarget(target: string): boolean {
+  try {
+    const u = new URL(target);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host === "0.0.0.0" ||
+      host.endsWith(".local") ||
+      host.endsWith(".internal")
+    ) {
+      return false;
+    }
+    const parts = host.split(".").map((p) => Number.parseInt(p, 10));
+    if (
+      parts.length === 4 &&
+      parts.every((p) => Number.isFinite(p) && p >= 0 && p <= 255)
+    ) {
+      if (
+        parts[0] === 10 ||
+        (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+        (parts[0] === 192 && parts[1] === 168) ||
+        parts[0] === 169 && parts[1] === 254
+      ) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function mapContentType(target: string, contentType?: string): string {
   if (isPlaylist(target, contentType)) {
     return "application/vnd.apple.mpegurl";
   }
   if (contentType && contentType.startsWith("video/")) return contentType;
-  if (/\.ts($|;|\?)/i.test(target)) return "video/mp2t";
+  if (contentType && contentType.startsWith("audio/")) return contentType;
+  const ctLower = (contentType || "").toLowerCase();
+  if (
+    /\.(ts|m2ts|mts)($|;|\?)/i.test(target) ||
+    ctLower.includes("mpeg") ||
+    ctLower.includes("mp2t")
+  ) {
+    return "video/mp2t";
+  }
   if (/\.m4s($|;|\?)/i.test(target)) return "video/mp4";
   if (/\.aac($|;|\?)/i.test(target)) return "audio/aac";
   if (/\.key($|;|\?)/i.test(target)) return "application/octet-stream";
+  if (contentType && /image\/jpeg/.test(contentType)) {
+    return "video/mp2t";
+  }
   if (contentType) return contentType;
   return "application/octet-stream";
 }
@@ -230,16 +324,28 @@ function rewritePlaylist(
 }
 
 export async function proxyStream(req: Request, res: Response): Promise<void> {
-  const target = (req.query.url as string) || "";
-  const referer = (req.query.referer as string) || undefined;
+  const target = firstQuery(req.query.url);
+  const referer = firstQuery(req.query.referer) || undefined;
   if (!target) {
     res.status(400).json({ success: false, message: "Missing url param" });
     return;
   }
 
+  if (!isSafeProxyTarget(target)) {
+    res.status(400).json({ success: false, message: "Invalid proxy target" });
+    return;
+  }
+
   try {
+    const upstreamHeaders: Record<string, string> = {};
+    if (referer) upstreamHeaders.Referer = referer;
+    upstreamHeaders["User-Agent"] =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+    if (req.headers.range) upstreamHeaders.Range = String(req.headers.range);
+    if (req.headers["if-range"]) upstreamHeaders["If-Range"] = String(req.headers["if-range"]);
+
     const upstream = await axios.get(target, {
-      headers: referer ? { Referer: referer } : {},
+      headers: upstreamHeaders,
       responseType: "stream",
       timeout: 15000,
       maxRedirects: 5,
@@ -248,6 +354,7 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
 
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
+    res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
     res.setHeader("Accept-Ranges", "bytes");
 
     const contentType = upstream.headers["content-type"] as string | undefined;
@@ -278,6 +385,7 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    res.status(upstream.status);
     res.setHeader("Content-Type", mapContentType(target, contentType));
     const contentLength = upstream.headers["content-length"];
     if (contentLength) {
@@ -286,12 +394,25 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
         Array.isArray(contentLength) ? contentLength[0] : String(contentLength),
       );
     }
+    const contentRange = upstream.headers["content-range"];
+    if (contentRange) {
+      res.setHeader(
+        "Content-Range",
+        Array.isArray(contentRange) ? contentRange[0] : String(contentRange),
+      );
+    }
     upstream.data.pipe(res);
     upstream.data.on("error", () => res.end());
-  } catch (error: any) {
-    const status = error?.response?.status || 502;
+    req.on("close", () => {
+      upstream.data.destroy();
+    });
+  } catch (error: unknown) {
+    const err = error as { response?: { status?: number } };
+    const status = err?.response?.status || 502;
     const message =
       error instanceof Error ? error.message : "Failed to proxy stream";
-    res.status(status).json({ success: false, message });
+    if (!res.headersSent) {
+      res.status(status).json({ success: false, message });
+    }
   }
 }

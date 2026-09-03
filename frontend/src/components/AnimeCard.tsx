@@ -8,7 +8,7 @@ interface Props {
 
 export default function AnimeCard({ anime }: Props) {
   return (
-    <Link to={`/anime/${anime.id}`} className="block group">
+    <Link to={`/anime/${anime.id}`} className="block group min-w-0">
       <div className="relative aspect-3/4 overflow-hidden rounded-xl border border-purple-500/10 transition-all duration-300 group-hover:border-purple-500/40">
         {/* Glow effect on hover */}
         <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-b from-purple-600/20 to-pink-500/20 opacity-0 group-hover:opacity-100 blur-lg transition duration-300 pointer-events-none" />
@@ -42,7 +42,7 @@ export default function AnimeCard({ anime }: Props) {
         {/* Rating badge */}
         {anime.rating && (
           <div className="absolute top-2 right-2 bg-black/60 backdrop-blur text-amber-400 text-[10px] sm:text-xs font-bold px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-lg flex items-center gap-1 border border-amber-500/20">
-            <span>★</span> {anime.rating}
+            {anime.rating}
           </div>
         )}
 

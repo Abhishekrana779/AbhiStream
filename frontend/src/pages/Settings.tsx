@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FiSettings,
   FiMonitor,
@@ -9,6 +9,7 @@ import {
   FiSliders,
 } from "react-icons/fi";
 import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useTheme } from "../context/ThemeContext";
 
 interface AppSettings {
   autoplay: boolean;
@@ -44,6 +45,11 @@ export default function Settings() {
     "playback" | "display" | "notifications"
   >("playback");
   const [saved, setSaved] = useState(false);
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    setTheme(settings.theme);
+  }, [settings.theme, setTheme]);
 
   const handleSettingChange = (
     key: keyof AppSettings,
@@ -73,7 +79,7 @@ export default function Settings() {
     icon: React.ReactNode;
     children: React.ReactNode;
   }) => (
-    <div className="flex items-center justify-between py-4 border-b border-dark-700 last:border-b-0">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 py-4 border-b border-dark-700 last:border-b-0">
       <div className="flex items-start gap-4">
         <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0 mt-1">
           {icon}
@@ -111,14 +117,14 @@ export default function Settings() {
   );
 
   return (
-    <div className="min-h-screen bg-dark-900 py-12">
+    <div className="min-h-screen bg-dark-900 pt-4 pb-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-            <FiSettings className="w-8 h-8 text-primary" />
-            Settings
-          </h1>
+<h1 className="text-3xl sm:text-4xl font-bold text-white flex items-center gap-3 break-words">
+          <FiSettings className="w-7 h-7 sm:w-8 sm:h-8 text-primary shrink-0" />
+          Settings
+        </h1>
           <p className="text-gray-400 mt-2">
             Customize your viewing experience
           </p>
@@ -127,14 +133,14 @@ export default function Settings() {
         {/* Success Message */}
         {saved && (
           <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg">
-            ✓ Settings saved successfully
+             Settings saved successfully
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
-            <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden sticky top-24">
+            <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden sticky top-[88px]">
               <button
                 onClick={() => setActiveTab("playback")}
                 className={`w-full px-4 py-3 text-left font-medium transition flex items-center gap-3 ${
@@ -391,17 +397,16 @@ export default function Settings() {
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-3 mt-8 pt-6 border-t border-dark-700">
+              <div className="flex flex-col sm:flex-row gap-3 mt-8 pt-6 border-t border-dark-700">
                 <button
                   onClick={handleSave}
                   disabled={!hasChanges}
-                  className={`flex-1 py-2 font-semibold rounded-lg transition flex items-center justify-center gap-2 ${
+                  className={`flex-1 px-4 py-2 font-semibold rounded-lg transition flex items-center justify-center gap-2 ${
                     hasChanges
                       ? "btn-primary"
-                      : "bg-dark-700 text-gray-500 cursor-not-allowed"
+                      : "bg-dark-700 text-gray-400 cursor-not-allowed"
                   }`}
                 >
-                  <FiShield className="w-5 h-5" />
                   Save Changes
                 </button>
                 <button

@@ -6,8 +6,7 @@ import ErrorMessage from "../components/ErrorMessage";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const { user } = useAuth();
+  const { login, user } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -86,7 +85,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="text-4xl font-bold text-white mb-2">AbhiStream</div>
+          <div className="text-3xl sm:text-4xl font-bold text-white mb-2 break-words">AbhiStream</div>
           <p className="text-gray-400">Welcome back</p>
         </div>
 

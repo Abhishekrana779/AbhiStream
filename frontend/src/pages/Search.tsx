@@ -7,6 +7,7 @@ import AnimeGrid from "../components/AnimeGrid";
 import Pagination from "../components/Pagination";
 import Loading from "../components/Loading";
 import ErrorMessage from "../components/ErrorMessage";
+import { FiSearch, FiX } from "react-icons/fi";
 import type { Anime } from "../types/anime";
 
 export default function Search() {
@@ -62,13 +63,12 @@ export default function Search() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8">
       <div className="max-w-2xl mx-auto mb-8">
         <h1 className="text-2xl font-bold text-white text-center mb-6">
           Search Anime
         </h1>
         <SearchBar
-          key={initialQuery}
           initialQuery={initialQuery}
           onSearch={(q) => {
             setQuery(q);
@@ -88,7 +88,7 @@ export default function Search() {
 
       {!loading && !error && searched && results.length === 0 && (
         <div className="text-center py-16">
-          <div className="text-5xl mb-4">🔍</div>
+          <div className="text-5xl mb-4 text-gray-500 flex justify-center"><FiX /></div>
           <p className="text-gray-400 text-lg">No anime found for "{query}"</p>
         </div>
       )}
@@ -109,7 +109,7 @@ export default function Search() {
 
       {!loading && !error && !searched && (
         <div className="text-center py-20">
-          <div className="text-6xl mb-4">🎭</div>
+          <div className="text-6xl mb-4 text-gray-500 flex justify-center"><FiSearch /></div>
           <p className="text-gray-400 text-lg">
             Search for your favorite anime
           </p>

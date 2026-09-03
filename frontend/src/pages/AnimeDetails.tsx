@@ -85,7 +85,7 @@ export default function AnimeDetails() {
 
   return (
     <div className="min-h-screen">
-      <div className="relative h-[40vh] sm:h-[50vh]">
+      <div className="relative h-[30vh] min-h-[200px] sm:h-[40vh] sm:min-h-[260px] md:h-[50vh]">
         <ImageWithFallback
           src={anime.cover || anime.poster}
           alt={anime.title}
@@ -95,7 +95,7 @@ export default function AnimeDetails() {
         <div className="absolute inset-0 bg-linear-to-t from-dark-900 via-dark-900/50 to-transparent" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-40 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 sm:-mt-32 md:-mt-40 relative z-10">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="shrink-0 w-44 sm:w-52 mx-auto md:mx-0">
             <div className="relative group">
@@ -112,9 +112,9 @@ export default function AnimeDetails() {
 
           <div className="flex-1 space-y-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
-                {anime.title}
-              </h1>
+<h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white break-words">
+              {anime.title}
+            </h1>
               {anime.jname && (
                 <p className="text-gray-400 italic mt-1">{anime.jname}</p>
               )}
@@ -218,7 +218,7 @@ export default function AnimeDetails() {
               </div>
             )}
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-3 pt-2 flex-wrap">
               {firstEpisode ? (
                 <button
                   onClick={() =>
@@ -293,9 +293,6 @@ export default function AnimeDetails() {
         {/* Related Anime Section */}
         {anime.relatedAnime.length > 0 && (
           <div className="mt-16">
-            <h2 className="text-2xl font-bold text-white mb-6">
-              Related Anime
-            </h2>
             <AnimeCarousel title="Related Anime" anime={anime.relatedAnime} />
           </div>
         )}
@@ -303,10 +300,7 @@ export default function AnimeDetails() {
         {/* Recommended Anime Section */}
         {anime.recommendedAnime.length > 0 && (
           <div className="mt-16 pb-12">
-            <h2 className="text-2xl font-bold text-white mb-6">
-              Recommended For You
-            </h2>
-            <AnimeCarousel title="Recommended" anime={anime.recommendedAnime} />
+            <AnimeCarousel title="Recommended For You" anime={anime.recommendedAnime} />
           </div>
         )}
       </div>

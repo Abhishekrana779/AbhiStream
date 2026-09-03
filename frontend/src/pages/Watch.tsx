@@ -17,7 +17,7 @@ import { animeApi } from "../services/animeApi";
 import { historyApi } from "../services/historyApi";
 import Loading from "../components/Loading";
 import ErrorMessage from "../components/ErrorMessage";
-import type { AnimeDetails, Episode, StreamingSource } from "../types/anime";
+import type { AnimeDetails, Episode, StreamingServer, StreamingSource } from "../types/anime";
 
 type TrackType = "sub" | "dub";
 
@@ -56,9 +56,93 @@ export default function Watch() {
   const [autoNext, setAutoNext] = useState(true);
   const [shortcuts, setShortcuts] = useState(true);
   const [lightsOff, setLightsOff] = useState(false);
+  const [dubAvailable, setDubAvailable] = useState(false);
+  const [servers, setServers] = useState<StreamingServer[]>([]);
+  const [activeProvider, setActiveProvider] = useState<string | null>(null);
+  const [favoriteServers, setFavoriteServers] = useState<Set<string>>(new Set());
   const seekingRef = useRef(false);
   const isPlayingRef = useRef(isPlaying);
   const wasPlayingBeforeSeekRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("abhistream_favorite_servers");
+      if (saved) {
+        setFavoriteServers(new Set(JSON.parse(saved)));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const fetchEpisodeSources = useCallback(
+    async (animeIdStr: string, epNumber: number, category: TrackType) => {
+      try {
+        const streaming = await animeApi.getEpisodeLinks(animeIdStr, epNumber, category);
+        if (streaming.sources.length > 0) return streaming;
+      } catch {
+        // fall through
+      }
+      return { sources: [] as StreamingSource[], headers: {} as Record<string, string> };
+    },
+    [],
+  );
+
+  const applyStreamingToPlayer = useCallback(
+    (streaming: {
+      sources: StreamingSource[];
+      headers: Record<string, string>;
+      intro?: { start: number; end: number };
+      outro?: { start: number; end: number };
+      servers?: StreamingServer[];
+    }) => {
+      setStreamingSources(streaming.sources);
+      setStreamingHeaders(streaming.headers || {});
+      setServers(streaming.servers || []);
+
+      let nextSource: StreamingSource | null = streaming.sources[0] || null;
+      if (!nextSource && anime?.externalStreams && anime.externalStreams.length > 0) {
+        const ext = anime.externalStreams[0];
+        nextSource = { url: ext.url, isM3U8: false, quality: ext.site || "external" };
+      }
+      setSelectedQuality(nextSource);
+      setActiveProvider(nextSource?.provider || streaming.servers?.[0]?.provider || null);
+    },
+    [anime],
+  );
+
+  const selectServer = useCallback(
+    (provider: string) => {
+      const server = servers.find((s) => s.provider === provider);
+      if (!server) return;
+      setActiveProvider(provider);
+      setSelectedQuality({
+        url: server.url,
+        isM3U8: server.isM3U8,
+        quality: server.quality,
+        provider: server.provider,
+      });
+      setStreamingHeaders(server.referer ? { Referer: server.referer } : {});
+      const v = videoRef.current;
+      if (v) {
+        v.pause();
+      }
+    },
+    [servers],
+  );
+
+  const toggleFavoriteServer = useCallback((provider: string) => {
+    setFavoriteServers((prev) => {
+      const next = new Set(prev);
+      if (next.has(provider)) {
+        next.delete(provider);
+      } else {
+        next.add(provider);
+      }
+      localStorage.setItem("abhistream_favorite_servers", JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -90,6 +174,7 @@ export default function Watch() {
 
       setLoading(true);
       setError(null);
+      setDubAvailable(false);
 
       try {
         const animeData = await animeApi.getInfo(animeId);
@@ -105,13 +190,35 @@ export default function Watch() {
           setTrackType(episode.isSub ? "sub" : episode.isDub ? "dub" : "sub");
         }
 
-        const streaming = await animeApi.getStreamingSources(episodeId);
-        setStreamingSources(streaming.sources);
-        setStreamingHeaders(streaming.headers);
+        const episodeNumber = episode?.number ?? 0;
 
-        if (streaming.sources.length > 0) {
-          setSelectedQuality(streaming.sources[0]);
+        let streaming: {
+          sources: StreamingSource[];
+          headers: Record<string, string>;
+          intro?: { start: number; end: number };
+          outro?: { start: number; end: number };
+          servers?: StreamingServer[];
+        } = { sources: [], headers: {} };
+        if (Number.isFinite(episodeNumber) && episodeNumber > 0) {
+          streaming = await fetchEpisodeSources(animeId, episodeNumber, "sub");
+
+          fetchEpisodeSources(animeId, episodeNumber, "dub")
+            .then((dubResult) => {
+              setDubAvailable(dubResult.sources.length > 0);
+            })
+            .catch(() => setDubAvailable(false));
         }
+
+        if (streaming.sources.length === 0) {
+          try {
+            const fallback = await animeApi.getStreamingSources(episodeId);
+            streaming = { ...streaming, sources: fallback.sources, headers: fallback.headers };
+          } catch {
+            // ignore
+          }
+        }
+
+        applyStreamingToPlayer(streaming);
 
         if (episode) {
           const historyItem = await historyApi.add({
@@ -136,6 +243,32 @@ export default function Watch() {
 
     fetchData();
   }, [animeId, episodeId]);
+
+  useEffect(() => {
+    if (!animeId || !episodeId) return;
+    const episodeNumber = currentEpisode?.number ?? 0;
+    if (!Number.isFinite(episodeNumber) || episodeNumber <= 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const streaming = await fetchEpisodeSources(animeId, episodeNumber, trackType);
+      if (cancelled) return;
+      if (streaming.sources.length > 0) {
+        setError(null);
+        applyStreamingToPlayer(streaming);
+      } else {
+        if (trackType === "dub") {
+          setTrackType("sub");
+          return;
+        }
+        setError("No sources available for this language");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trackType, animeId, episodeId, currentEpisode, fetchEpisodeSources, applyStreamingToPlayer]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -211,27 +344,49 @@ export default function Watch() {
   }, [selectedQuality, streamingHeaders]);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (videoRef.current && historyId && duration > 0) {
-        const progress = videoRef.current.currentTime;
-        const completed = progress / duration > 0.9;
+    if (!historyId) return;
 
-        try {
-          if (Math.round(progress) % 10 === 0) {
-            await historyApi.update(historyId, {
-              progress,
-              duration,
-              completed,
-            });
-          }
-        } catch {
-          // Silently fail to not interrupt playback
-        }
+    let cancelled = false;
+    let consecutiveFailures = 0;
+    let inFlight = false;
+    let lastSentProgress = -1;
+
+    const tick = async () => {
+      if (cancelled || inFlight) return;
+      const video = videoRef.current;
+      if (!video || video.duration <= 0) return;
+      const progress = video.currentTime;
+      if (Math.round(progress) === lastSentProgress) return;
+      inFlight = true;
+      try {
+        await historyApi.update(historyId, {
+          progress,
+          duration: video.duration,
+          completed: progress / video.duration > 0.9,
+        });
+        lastSentProgress = Math.round(progress);
+        consecutiveFailures = 0;
+      } catch {
+        consecutiveFailures++;
+      } finally {
+        inFlight = false;
       }
-    }, 5000);
+    };
 
-    return () => clearInterval(interval);
-  }, [historyId, duration]);
+    const interval = setInterval(() => {
+      if (consecutiveFailures >= 3) return;
+      if (consecutiveFailures > 0) {
+        setTimeout(tick, 2000 * consecutiveFailures);
+      } else {
+        void tick();
+      }
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [historyId]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -298,25 +453,69 @@ export default function Watch() {
     video.currentTime = Math.min(duration, video.currentTime + 15);
   }, [duration]);
 
+  const lockLandscape = async (): Promise<void> => {
+    type OrientAPI = {
+      lock?: (orientation: string) => Promise<void>;
+    };
+    const screenWithOrient = screen as Screen & { orientation?: OrientAPI };
+    const orientation = screenWithOrient.orientation as
+      | (OrientAPI & { lock?: (orientation: string) => Promise<void> })
+      | undefined;
+    try {
+      if (orientation?.lock) {
+        await orientation.lock("landscape");
+      }
+    } catch {
+      // Lock request can fail on unsupported devices / insecure contexts — ignore.
+    }
+  };
+
+  const unlockOrientation = (): void => {
+    type OrientAPI = {
+      lock?: (orientation: string) => Promise<void>;
+    };
+    const screenWithOrient = screen as Screen & { orientation?: OrientAPI };
+    const orientation = screenWithOrient.orientation as
+      | (OrientAPI & { unlock?: () => void })
+      | undefined;
+    try {
+      orientation?.unlock?.();
+    } catch {
+      // ignore
+    }
+  };
+
   const handleFullscreen = useCallback(() => {
     const container = playerContainerRef.current;
     if (!container) return;
     if (!document.fullscreenElement) {
-      container.requestFullscreen().catch(() => {
-        setIsFullscreen(false);
-      });
-      setIsFullscreen(true);
+      container
+        .requestFullscreen()
+        .then(() => {
+          setIsFullscreen(true);
+          void lockLandscape();
+        })
+        .catch(() => {
+          setIsFullscreen(false);
+        });
     } else {
-      document.exitFullscreen().catch(() => {
-        setIsFullscreen(true);
-      });
-      setIsFullscreen(false);
+      document
+        .exitFullscreen()
+        .then(() => {
+          setIsFullscreen(false);
+          unlockOrientation();
+        })
+        .catch(() => {
+          setIsFullscreen(true);
+        });
     }
   }, []);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const inFs = !!document.fullscreenElement;
+      setIsFullscreen(inFs);
+      if (!inFs) unlockOrientation();
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () =>
@@ -325,7 +524,12 @@ export default function Watch() {
 
   const goToNextEpisode = () => {
     if (!anime || !currentEpisode) return;
-    const list = trackType === "sub" ? anime.subEpisodesList : anime.dubEpisodesList;
+    const list =
+      trackType === "sub"
+        ? anime.subEpisodesList
+        : anime.dubEpisodesList.length > 0
+          ? anime.dubEpisodesList
+          : anime.subEpisodesList;
     const currentIndex = list.findIndex((ep) => ep.id === episodeId);
     if (currentIndex < list.length - 1) {
       const nextEpisode = list[currentIndex + 1];
@@ -339,20 +543,17 @@ export default function Watch() {
 
   const handleTrackTypeChange = (type: TrackType) => {
     setTrackType(type);
-    const list =
-      type === "sub" ? anime?.subEpisodesList : anime?.dubEpisodesList;
-    const firstEp = list?.[0];
-    if (firstEp && firstEp.id !== episodeId) {
-      navigate(`/watch/${animeId}/${firstEp.id}`);
-    }
   };
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !autoSkip) return;
 
+    let applied = false;
     const handleTimeUpdate = () => {
+      if (applied) return;
       if (video.currentTime < 30 && video.currentTime > 0) {
+        applied = true;
         video.currentTime = 30;
       }
     };
@@ -373,7 +574,15 @@ export default function Watch() {
     if (!shortcuts) return;
 
     const handleKey = (e: KeyboardEvent) => {
-      if (document.activeElement?.tagName === "INPUT") return;
+      const active = document.activeElement;
+      const tag = active?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      ) {
+        return;
+      }
       const video = videoRef.current;
       if (!video) return;
 
@@ -424,15 +633,15 @@ export default function Watch() {
     );
   }
 
-  if (error) {
+  if (!anime) {
     return (
-      <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
-        <ErrorMessage message={error} />
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+        <Loading type="detail" />
       </div>
     );
   }
 
-  if (!anime || !currentEpisode || !selectedQuality) {
+  if (!currentEpisode) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center">
         <ErrorMessage message="Episode not found" />
@@ -443,12 +652,16 @@ export default function Watch() {
   const subEpisodes = anime.subEpisodesList;
   const dubEpisodes = anime.dubEpisodesList;
   const currentTrackList =
-    trackType === "sub" ? subEpisodes : dubEpisodes;
+    trackType === "sub"
+      ? subEpisodes
+      : dubEpisodes.length > 0
+        ? dubEpisodes
+        : subEpisodes;
   const currentIndex = currentTrackList.findIndex((ep) => ep.id === episodeId);
   const canNext = currentIndex < currentTrackList.length - 1;
 
   return (
-    <div className="min-h-screen bg-dark-900 overflow-x-hidden pt-[70px]">
+    <div className="min-h-screen bg-dark-900 overflow-x-hidden">
       <div className="max-w-[1600px] mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px]">
           {/* Main Content */}
@@ -459,6 +672,10 @@ export default function Watch() {
               className="relative bg-black touch-manipulation"
               onMouseEnter={() => setShowControls(true)}
               onMouseLeave={() => setShowControls(isPlaying ? false : true)}
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                handleFullscreen();
+              }}
               onClick={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.tagName === "VIDEO" || target.closest("video")) {
@@ -468,6 +685,19 @@ export default function Watch() {
                 }
               }}
             >
+              {error && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20 px-4">
+                  <p className="text-red-400 text-base sm:text-lg mb-2">Playback Error</p>
+                  <p className="text-gray-300 text-xs sm:text-sm text-center mb-4">{error}</p>
+                  <button
+                    onClick={() => setError(null)}
+                    className="px-4 py-2 bg-primary text-white text-xs sm:text-sm rounded-lg hover:bg-primary-hover transition"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               <video
                 ref={videoRef}
                 className="w-full aspect-video"
@@ -588,7 +818,7 @@ export default function Watch() {
                     {canNext && (
                       <button
                         onClick={goToNextEpisode}
-                        className="text-[10px] sm:text-xs text-gray-300 hover:text-white transition touch-manipulation hidden xs:inline"
+                        className="text-[10px] sm:text-xs text-gray-300 hover:text-white transition touch-manipulation hidden sm:inline"
                       >
                         Next Ep
                       </button>
@@ -597,15 +827,44 @@ export default function Watch() {
 
                   {/* Right controls */}
                   <div className="flex items-center gap-1 sm:gap-2">
-                    {streamingSources.length > 1 && (
+                    {/* Server selector */}
+                    {servers.length > 1 && (
                       <select
-                        value={streamingSources.indexOf(selectedQuality)}
-                        onChange={(e) =>
-                          setSelectedQuality(
-                            streamingSources[parseInt(e.target.value)],
-                          )
+                        aria-label="Select server"
+                        value={activeProvider || ""}
+                        onChange={(e) => selectServer(e.target.value)}
+                        className="bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-xs border border-white/30 rounded px-1.5 sm:px-2 py-1 focus:outline-none focus:border-primary appearance-none cursor-pointer touch-manipulation"
+                      >
+                        {servers.map((s) => (
+                          <option
+                            key={s.provider}
+                            value={s.provider}
+                            className="bg-dark-800"
+                          >
+                            {favoriteServers.has(s.provider) ? "" : ""}{s.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Quality selector */}
+                    {streamingSources.length > 1 && servers.length <= 1 && (
+                      <select
+                        aria-label="Select quality"
+                        value={
+                          selectedQuality
+                            ? (streamingSources.indexOf(selectedQuality) >= 0
+                              ? streamingSources.indexOf(selectedQuality)
+                              : 0)
+                            : 0
                         }
-                        className="bg-transparent text-white text-[10px] sm:text-xs border border-white/30 rounded px-1 sm:px-1.5 py-0.5 focus:outline-none focus:border-primary appearance-none cursor-pointer touch-manipulation"
+                        onChange={(e) => {
+                          const idx = Number.parseInt(e.target.value, 10);
+                          if (Number.isFinite(idx) && idx >= 0 && idx < streamingSources.length) {
+                            setSelectedQuality(streamingSources[idx]);
+                          }
+                        }}
+                        className="bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-xs border border-white/30 rounded px-1 sm:px-1.5 py-1 focus:outline-none focus:border-primary appearance-none cursor-pointer touch-manipulation"
                       >
                         {streamingSources.map((source, idx) => (
                           <option key={idx} value={idx} className="bg-dark-800">
@@ -689,18 +948,15 @@ export default function Watch() {
             </div>
 
             {/* Episode Info Bar */}
-            <div className="px-3 sm:px-6 py-2.5 flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 bg-dark-800/50 border-t border-dark-700">
+            <div className="px-3 sm:px-6 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-dark-800/50 border-t border-dark-700">
               <div className="flex items-center gap-2 text-gray-300 text-xs sm:text-sm">
                 <FiList className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="font-medium">Episode {currentEpisode.number}</span>
-                <span className="text-gray-500 hidden sm:inline">In 6d 20h</span>
-                <span className="text-gray-600 hidden sm:inline">•</span>
-                <span className="text-gray-500 hidden sm:inline">Sun, Sep 6, 04:34</span>
               </div>
 
               {/* SUB/DUB Toggle */}
-              {anime && anime.subEpisodesList.length > 0 && anime.dubEpisodesList.length > 0 && (
-                <div className="flex bg-dark-700 rounded-lg p-0.5 border border-dark-600 self-end xs:self-auto">
+              {anime && anime.subEpisodesList.length > 0 && dubAvailable && (
+                <div className="flex bg-dark-700 rounded-lg p-0.5 border border-dark-600 self-end sm:self-auto">
                   <button
                     onClick={() => handleTrackTypeChange("sub")}
                     className={`px-2 sm:px-3 py-1 rounded-md text-[10px] sm:text-xs font-semibold transition ${
@@ -728,8 +984,8 @@ export default function Watch() {
 
           {/* Episode Selector Sidebar - desktop */}
           <div className="hidden lg:block bg-dark-800/30 border-l border-dark-700 p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="relative flex-1">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="relative flex-1 min-w-0">
                 <FiSearch className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
                 <input
                   type="text"
@@ -737,33 +993,40 @@ export default function Watch() {
                   className="w-full bg-dark-700 border border-dark-600 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-primary"
                 />
               </div>
-
-              {/* SUB/DUB Toggle */}
-              {anime && anime.subEpisodesList.length > 0 && anime.dubEpisodesList.length > 0 && (
-                <div className="flex bg-dark-700 rounded-lg p-0.5 border border-dark-600">
-                  <button
-                    onClick={() => handleTrackTypeChange("sub")}
-                    className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${
-                      trackType === "sub"
-                        ? "bg-primary text-white"
-                        : "text-gray-400 hover:text-white"
-                    }`}
-                  >
-                    SUB
-                  </button>
-                  <button
-                    onClick={() => handleTrackTypeChange("dub")}
-                    className={`px-2 py-1 rounded-md text-[10px] font-semibold transition ${
-                      trackType === "dub"
-                        ? "bg-primary text-white"
-                        : "text-gray-400 hover:text-white"
-                    }`}
-                  >
-                    DUB
-                  </button>
-                </div>
-              )}
             </div>
+
+            {/* Server Selection */}
+            {servers.length > 1 && (
+              <div className="mb-3">
+                <div className="flex items-center gap-1 mb-1.5">
+                  <FiSettings className="w-3 h-3 text-gray-500" />
+                  <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Server</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {servers.map((s) => (
+                    <button
+                      key={s.provider}
+                      onClick={() => selectServer(s.provider)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        toggleFavoriteServer(s.provider);
+                      }}
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition ${
+                        activeProvider === s.provider
+                          ? "bg-primary text-white"
+                          : "bg-dark-700 text-gray-400 hover:text-white border border-dark-600 hover:border-primary/40"
+                      }`}
+                      title={`${s.label}${favoriteServers.has(s.provider) ? " (favorite)" : ""} — right-click to toggle favorite`}
+                    >
+                      {favoriteServers.has(s.provider) && (
+                        <span className="text-yellow-400">★</span>
+                      )}
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Episode Grid */}
             <div className="grid grid-cols-5 gap-1.5">
@@ -803,13 +1066,12 @@ export default function Watch() {
             </div>
 
             {/* Next Episode Info */}
-            {canNext && (
+            {canNext && currentTrackList[currentIndex + 1] && (
               <div className="mt-4 p-3 bg-dark-700/50 rounded-lg border border-dark-600">
                 <div className="flex items-center gap-2 text-gray-300 text-xs">
                   <FiClock className="w-4 h-4" />
                   <div>
-                    <p className="font-medium">Episode {currentTrackList[currentIndex + 1]?.number} In 6d 20h</p>
-                    <p className="text-gray-500">Sun, Sep 6, 04:34</p>
+                    <p className="font-medium">Episode {currentTrackList[currentIndex + 1].number}</p>
                   </div>
                 </div>
               </div>
@@ -824,32 +1086,6 @@ export default function Watch() {
               <FiList className="w-4 h-4 sm:w-5 sm:h-5" />
               Episodes
             </h2>
-
-            {/* SUB/DUB Toggle */}
-            {anime && anime.subEpisodesList.length > 0 && anime.dubEpisodesList.length > 0 && (
-              <div className="flex bg-dark-700 rounded-lg p-0.5 border border-dark-600">
-                <button
-                  onClick={() => handleTrackTypeChange("sub")}
-                  className={`px-2 sm:px-3 py-1 rounded-md text-[10px] sm:text-xs font-semibold transition ${
-                    trackType === "sub"
-                      ? "bg-primary text-white"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  SUB
-                </button>
-                <button
-                  onClick={() => handleTrackTypeChange("dub")}
-                  className={`px-2 sm:px-3 py-1 rounded-md text-[10px] sm:text-xs font-semibold transition ${
-                    trackType === "dub"
-                      ? "bg-primary text-white"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  DUB
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Episode Filter/Search for mobile */}
@@ -863,7 +1099,7 @@ export default function Watch() {
           </div>
 
           {/* Episode Grid for mobile */}
-          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5 sm:gap-2">
+          <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:hidden gap-1.5 sm:gap-2">
             {currentTrackList.map((ep) => {
               const isCurrent = ep.id === episodeId;
               return (

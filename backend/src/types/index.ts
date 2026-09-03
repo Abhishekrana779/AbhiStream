@@ -228,12 +228,27 @@ export interface StreamingSource {
   url: string;
   isM3U8: boolean;
   quality: string;
+  provider?: string;
 }
 
 export interface StreamingData {
   sources: StreamingSource[];
   download: string;
   headers: Record<string, string>;
+  intro?: { start: number; end: number };
+  outro?: { start: number; end: number };
+  subtitles?: Array<{ url?: string; file?: string; label?: string; lang?: string }>;
+  servers?: Array<{
+    provider: string;
+    label: string;
+    url: string;
+    isM3U8: boolean;
+    quality: string;
+    referer?: string;
+    intro?: { start: number; end: number };
+    outro?: { start: number; end: number };
+    working: boolean;
+  }>;
 }
 
 export interface Genre {

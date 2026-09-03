@@ -65,10 +65,10 @@ export default function AnimeCarousel({ title, anime, linkTo }: Props) {
         <div
           ref={scrollRef}
           onScroll={checkScroll}
-          className="flex gap-4 overflow-x-auto hide-scrollbar pb-2"
+          className="flex gap-3 sm:gap-4 overflow-x-auto hide-scrollbar pb-2 snap-x snap-mandatory scroll-pl-3 sm:scroll-pl-0"
         >
           {anime.map((item) => (
-            <div key={item.id} className="shrink-0 w-40 sm:w-45 md:w-50">
+            <div key={item.id} className="shrink-0 w-40 sm:w-44 md:w-52">
               <AnimeCard anime={item} />
             </div>
           ))}

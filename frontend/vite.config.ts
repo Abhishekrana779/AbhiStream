@@ -10,18 +10,25 @@ export default defineConfig({
 
   server: {
     host: "0.0.0.0",
-    allowedHosts: ["abhistream-1.onrender.com"],
+    allowedHosts: true,
 
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:5000",
+        target: process.env.BACKEND_URL || process.env.VITE_BACKEND_URL || "http://127.0.0.1:5000",
         changeOrigin: true,
+        secure: false,
+        rewriteWsOrigin: true,
+      },
+      "/uploads": {
+        target: process.env.BACKEND_URL || process.env.VITE_BACKEND_URL || "http://127.0.0.1:5000",
+        changeOrigin: true,
+        secure: false,
       },
     },
   },
 
   preview: {
     host: "0.0.0.0",
-    allowedHosts: ["abhistream-1.onrender.com"],
+    allowedHosts: true,
   },
 });

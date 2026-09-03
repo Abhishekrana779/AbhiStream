@@ -26,6 +26,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
   }, []);
 
+  useEffect(() => {
+    const handleAuthCleared = () => {
+      setUser(null);
+      setToken(null);
+    };
+    window.addEventListener("abhistream:auth-cleared", handleAuthCleared);
+    return () => window.removeEventListener("abhistream:auth-cleared", handleAuthCleared);
+  }, []);
+
   const refreshUser = useCallback(async () => {
     try {
       const userData = await authApi.getMe();

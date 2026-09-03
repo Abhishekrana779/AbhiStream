@@ -11,13 +11,15 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
   });
 
   const setValue = (value: T | ((prev: T) => T)) => {
-    const valueToStore = value instanceof Function ? value(storedValue) : value;
-    setStoredValue(valueToStore);
-    try {
-      localStorage.setItem(key, JSON.stringify(valueToStore));
-    } catch {
-      // Storage full or unavailable
-    }
+    setStoredValue((prev) => {
+      const valueToStore = value instanceof Function ? value(prev) : value;
+      try {
+        localStorage.setItem(key, JSON.stringify(valueToStore));
+      } catch {
+        // Storage full or unavailable
+      }
+      return valueToStore;
+    });
   };
 
   useEffect(() => {

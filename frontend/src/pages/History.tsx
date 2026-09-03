@@ -98,7 +98,7 @@ export default function History() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
@@ -132,9 +132,9 @@ export default function History() {
                 key={item._id}
                 className="group relative overflow-hidden rounded-lg bg-dark-700 border border-dark-600 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10"
               >
-                <div className="flex gap-4 p-4">
+                <div className="flex gap-3 sm:gap-4 p-3 sm:p-4">
                   {/* Poster */}
-                  <div className="shrink-0 w-24 h-32">
+                  <div className="shrink-0 w-20 sm:w-24 h-28 sm:h-32">
                     <ImageWithFallback
                       src={item.poster}
                       alt={item.animeTitle}
@@ -221,7 +221,7 @@ export default function History() {
         </div>
       ) : (
         <div className="text-center py-16">
-          <div className="text-5xl mb-4">📺</div>
+          <div className="text-5xl mb-4 text-gray-500 flex justify-center"><FiClock /></div>
           <p className="text-gray-400 text-lg mb-6">
             Your watch history is empty
           </p>

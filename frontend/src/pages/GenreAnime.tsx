@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import { FiFilm } from "react-icons/fi";
 import { animeApi } from "../services/animeApi";
 import AnimeGrid from "../components/AnimeGrid";
 import Pagination from "../components/Pagination";
@@ -77,7 +78,7 @@ export default function GenreAnime() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8">
       <div className="mb-8">
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
           {decodedGenre}
@@ -100,7 +101,7 @@ export default function GenreAnime() {
         </>
       ) : (
         <div className="text-center py-16">
-          <div className="text-5xl mb-4">🎬</div>
+          <div className="text-5xl mb-4 text-gray-500 flex justify-center"><FiFilm /></div>
           <p className="text-gray-400 text-lg">
             No anime found in the {decodedGenre} genre
           </p>

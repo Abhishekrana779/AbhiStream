@@ -8,6 +8,18 @@
     "build": "npm run build --prefix frontend && npm run build --prefix backend"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^9.2.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3"
   }
 }
