@@ -516,37 +516,41 @@ export const miruroClient = {
       };
 
       if (!env.STREAM_API_URL) {
-        const { data } = await anilist.post<AniListResponse<{ Media: AniListMedia }>>("", {
-          query: EPISODES_QUERY,
-          variables: { id: Number.parseInt(anilistId, 10) },
-        });
-        if (data.errors && data.errors.length > 0) return empty;
-        const streams = (data.data?.Media.streamingEpisodes || []).filter(
-          (s) => /episode-?(\d+)/i.test(s?.url || ""),
-        );
-        const match = streams.find((s) => {
-          const m = /episode-?(\d+)/i.exec(s?.url || "");
-          return m && Number(m[1]) === episodeNumber;
-        });
-        if (!match || !match.url) return empty;
-        return {
-          sources: [{ url: match.url, isM3U8: false, quality: match.site || "external", provider: "external" }],
-          download: "",
-          headers: {},
-          intro: undefined,
-          outro: undefined,
-          subtitles: [],
-          servers: [
-            {
-              provider: "external",
-              label: match.site || "External",
-              url: match.url,
-              isM3U8: false,
-              quality: match.site || "external",
-              working: true,
-            },
-          ],
-        };
+        try {
+          const { data } = await anilist.post<AniListResponse<{ Media: AniListMedia }>>("", {
+            query: EPISODES_QUERY,
+            variables: { id: Number.parseInt(anilistId, 10) },
+          });
+          if (data.errors && data.errors.length > 0) return empty;
+          const streams = (data.data?.Media.streamingEpisodes || []).filter(
+            (s) => /episode-?(\d+)/i.test(s?.url || ""),
+          );
+          const match = streams.find((s) => {
+            const m = /episode-?(\d+)/i.exec(s?.url || "");
+            return m && Number(m[1]) === episodeNumber;
+          });
+          if (!match || !match.url) return empty;
+          return {
+            sources: [{ url: match.url, isM3U8: false, quality: match.site || "external", provider: "external" }],
+            download: "",
+            headers: {},
+            intro: undefined,
+            outro: undefined,
+            subtitles: [],
+            servers: [
+              {
+                provider: "external",
+                label: match.site || "External",
+                url: match.url,
+                isM3U8: false,
+                quality: match.site || "external",
+                working: true,
+              },
+            ],
+          };
+        } catch {
+          return empty;
+        }
       }
 
       const base = env.STREAM_API_URL.replace(/\/$/, "");

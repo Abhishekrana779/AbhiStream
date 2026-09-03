@@ -14,7 +14,7 @@ const app = express();
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    const allowed = [env.CLIENT_URL, ...env.ALLOWED_ORIGINS];
+    const allowed = [env.CLIENT_URL, ...env.ALLOWED_ORIGINS].filter(Boolean);
     if (allowed.includes("*") || allowed.includes(origin)) {
       return callback(null, true);
     }

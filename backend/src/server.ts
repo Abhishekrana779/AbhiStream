@@ -12,11 +12,12 @@ const start = async (): Promise<void> => {
       console.log(`Health check: /api/health`);
     });
 
-    const shutdown = async (signal: string) => {
+    const shutdown = async (signal: string): Promise<void> => {
       console.log(`${signal} received. Shutting down gracefully...`);
 
-      server.close(() => {
-        console.log("HTTP server closed.");
+      server.close((err) => {
+        if (err) console.error("Error closing HTTP server:", err);
+        else console.log("HTTP server closed.");
       });
 
       try {
@@ -26,15 +27,19 @@ const start = async (): Promise<void> => {
         console.error("Error closing MongoDB connection:", err);
       }
 
-      process.exit(0);
+      setTimeout(() => process.exit(0), 500).unref();
     };
 
-    process.on("SIGTERM", () => shutdown("SIGTERM"));
-    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => {
+      void shutdown("SIGTERM");
+    });
+    process.on("SIGINT", () => {
+      void shutdown("SIGINT");
+    });
   } catch (err) {
     console.error("Failed to start server:", err);
     process.exit(1);
   }
 };
 
-start();
+void start();
