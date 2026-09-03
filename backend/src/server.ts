@@ -12,22 +12,43 @@ const start = async (): Promise<void> => {
       console.log(`Health check: /api/health`);
     });
 
-    const shutdown = async (signal: string): Promise<void> => {
+    const shutdown = (signal: string): Promise<void> => {
       console.log(`${signal} received. Shutting down gracefully...`);
 
-      server.close((err) => {
-        if (err) console.error("Error closing HTTP server:", err);
-        else console.log("HTTP server closed.");
+      return new Promise<void>((resolve) => {
+        let httpClosed = false;
+        let dbClosed = false;
+        const finish = (): void => {
+          if (httpClosed && dbClosed) resolve();
+        };
+
+        server.close((err) => {
+          if (err) console.error("Error closing HTTP server:", err);
+          else console.log("HTTP server closed.");
+          httpClosed = true;
+          finish();
+        });
+
+        mongoose.connection
+          .close()
+          .then(() => {
+            console.log("MongoDB connection closed.");
+          })
+          .catch((err) => {
+            console.error("Error closing MongoDB connection:", err);
+          })
+          .finally(() => {
+            dbClosed = true;
+            finish();
+          });
+
+        setTimeout(() => {
+          console.warn("Shutdown timed out after 10s, forcing exit.");
+          process.exit(1);
+        }, 10000).unref();
+      }).then(() => {
+        process.exit(0);
       });
-
-      try {
-        await mongoose.connection.close();
-        console.log("MongoDB connection closed.");
-      } catch (err) {
-        console.error("Error closing MongoDB connection:", err);
-      }
-
-      setTimeout(() => process.exit(0), 500).unref();
     };
 
     process.on("SIGTERM", () => {

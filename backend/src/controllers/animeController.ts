@@ -337,10 +337,18 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const upstreamHeaders: Record<string, string> = {};
+    const controller = new AbortController();
+    const onClientClose = (): void => {
+      controller.abort();
+    };
+    req.on("close", onClientClose);
+
+    const upstreamHeaders: Record<string, string> = {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+      Accept: "*/*",
+    };
     if (referer) upstreamHeaders.Referer = referer;
-    upstreamHeaders["User-Agent"] =
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
     if (req.headers.range) upstreamHeaders.Range = String(req.headers.range);
     if (req.headers["if-range"]) upstreamHeaders["If-Range"] = String(req.headers["if-range"]);
 
@@ -349,6 +357,7 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
       responseType: "stream",
       timeout: 15000,
       maxRedirects: 5,
+      signal: controller.signal,
       validateStatus: (status) => status < 500,
     });
 
@@ -382,6 +391,7 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
       const rewritten = rewritePlaylist(body, target, referer);
       res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
       res.status(upstream.status).send(rewritten);
+      req.off("close", onClientClose);
       return;
     }
 
@@ -403,11 +413,16 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
     }
     upstream.data.pipe(res);
     upstream.data.on("error", () => res.end());
-    req.on("close", () => {
+    res.on("close", () => {
+      controller.abort();
       upstream.data.destroy();
     });
   } catch (error: unknown) {
-    const err = error as { response?: { status?: number } };
+    const err = error as { response?: { status?: number }; code?: string };
+    if (err?.code === "ERR_CANCELED" || (error as Error)?.name === "CanceledError") {
+      if (!res.headersSent) res.end();
+      return;
+    }
     const status = err?.response?.status || 502;
     const message =
       error instanceof Error ? error.message : "Failed to proxy stream";
