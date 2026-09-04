@@ -253,11 +253,11 @@ export default function AnimeDetails() {
 
         {/* Episodes Section */}
         <div className="mt-12">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Episodes</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Episodes</h2>
             {anime.subEpisodesList.length > 0 &&
               anime.dubEpisodesList.length > 0 && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 self-start sm:self-auto">
                   <button
                     onClick={() => setShowSub(true)}
                     className={`px-4 py-2 rounded-lg font-medium transition ${

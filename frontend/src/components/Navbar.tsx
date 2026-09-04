@@ -313,7 +313,7 @@ export default function Navbar() {
 
           {/* ================= MOBILE MENU ================= */}
 
-          <div className="absolute left-0 right-0 top-[48px] z-[60] overflow-hidden border-b border-white/10 bg-gradient-to-br from-[#211b3d] via-[#2d2149] to-[#1c1830] shadow-2xl lg:hidden sm:top-[52px]">
+          <div className="fixed left-0 right-0 top-[48px] z-[60] max-h-[calc(100dvh-48px)] overflow-y-auto border-b border-white/10 bg-gradient-to-br from-[#211b3d] via-[#2d2149] to-[#1c1830] shadow-2xl lg:hidden sm:top-[52px] sm:max-h-[calc(100dvh-52px)]">
 
             {/* Background Glow */}
 

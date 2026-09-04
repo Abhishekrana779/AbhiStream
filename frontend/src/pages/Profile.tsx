@@ -221,7 +221,7 @@ export default function Profile() {
         </div>
 
         <div className="mb-6 p-4 bg-dark-800 border border-dark-700 rounded-xl">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-start sm:gap-4 sm:text-left">
             <div className="w-20 h-20 rounded-full overflow-hidden shrink-0 bg-dark-700">
               <ImageWithFallback
                 src={user.avatar}
@@ -233,11 +233,11 @@ export default function Profile() {
               <h2 className="text-2xl font-bold text-white break-words">
                 {user.username}
               </h2>
-              <p className="text-gray-400 text-sm flex items-center gap-2 mt-1 break-all">
+              <p className="text-gray-400 text-sm flex items-center justify-center gap-2 mt-1 break-all sm:justify-start">
                 <FiMail className="w-4 h-4 shrink-0" />
                 {user.email}
               </p>
-              <p className="text-gray-500 text-sm flex items-center gap-2 mt-2">
+              <p className="text-gray-500 text-sm flex items-center justify-center gap-2 mt-2 sm:justify-start">
                 <FiCalendar className="w-4 h-4 shrink-0" />
                 Member since {formatDate(user.createdAt)}
               </p>
@@ -322,7 +322,7 @@ export default function Profile() {
                         Profile Picture
                       </label>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                         <div className="w-16 h-16 rounded-full overflow-hidden border border-dark-600 bg-dark-700 shrink-0">
                           {avatarPreview ? (
                             <img
@@ -339,7 +339,7 @@ export default function Profile() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:border-primary transition">
                             <FiUpload className="w-4 h-4" />
                             Choose Image

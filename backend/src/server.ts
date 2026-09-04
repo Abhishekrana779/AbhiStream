@@ -7,7 +7,7 @@ const start = async (): Promise<void> => {
   try {
     await connectDB();
 
-    const server = app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, "0.0.0.0", () => {
       console.log(`AbhiStream server running on port ${env.PORT}`);
       console.log(`Health check: /api/health`);
     });

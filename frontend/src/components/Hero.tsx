@@ -23,7 +23,7 @@ export default function Hero({ anime, loading }: Props) {
   if (!anime) return null;
 
   return (
-    <div className="relative w-full h-[60vh] min-h-[420px] sm:h-[65vh] sm:min-h-[480px] md:h-[70vh] overflow-hidden group">
+    <div className="relative w-full min-h-[460px] sm:h-[65vh] sm:min-h-[480px] md:h-[70vh] overflow-hidden group">
       <ImageWithFallback
         src={anime.cover || anime.poster}
         alt={anime.title}
@@ -36,7 +36,7 @@ export default function Hero({ anime, loading }: Props) {
       {/* Gradient overlay enhancement */}
       <div className="absolute inset-0 bg-gradient-to-r from-purple-900/20 to-transparent opacity-0 group-hover:opacity-100 transition duration-500" />
 
-      <div className="relative h-full flex items-end pb-8 sm:pb-12 md:pb-16 px-4 sm:px-8 md:px-12 lg:px-20 xl:px-24">
+      <div className="relative flex min-h-[460px] items-end pb-8 sm:h-full sm:min-h-0 sm:pb-12 md:pb-16 px-4 sm:px-8 md:px-12 lg:px-20 xl:px-24">
         <div className="max-w-2xl space-y-4">
           <div className="flex flex-wrap gap-2">
             {anime.genres.slice(0, 3).map((genre) => (
@@ -49,7 +49,7 @@ export default function Hero({ anime, loading }: Props) {
             ))}
           </div>
 
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight">
+          <h1 className="text-2xl sm:text-2xl md:text-2xl lg:text-3xl font-bold text-white leading-tight">
             {anime.title}
           </h1>
 
@@ -83,7 +83,7 @@ export default function Hero({ anime, loading }: Props) {
               <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 blur-lg opacity-70 group-hover:opacity-100 transition duration-300" />
               <button
                 onClick={() => navigate(`/anime/${anime.id}`)}
-                className="relative flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 text-white font-bold text-base hover:shadow-xl hover:shadow-purple-500/50 transition-all group-hover:scale-105 duration-300"
+                className="relative flex items-center gap-2 px-5 sm:px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 text-white font-bold text-sm sm:text-base hover:shadow-xl hover:shadow-purple-500/50 transition-all group-hover:scale-105 duration-300"
               >
                 <FiPlay className="w-5 h-5" />
                 Watch Now

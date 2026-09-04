@@ -5,7 +5,7 @@ import type { ApiResponse } from "../types";
 
 export async function getWatchlist(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const items = await Watchlist.find({ userId: req.user!.userId }).sort({ addedAt: -1 });
+    const items = await Watchlist.find({ userId: req.user!.userId }).sort({ createdAt: -1 });
     const response: ApiResponse<typeof items> = { success: true, data: items };
     res.json(response);
   } catch (error) {

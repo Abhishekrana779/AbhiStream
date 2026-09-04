@@ -292,7 +292,7 @@ export interface WatchlistDocument {
   title: string;
   poster: string;
   status: string | null;
-  addedAt: Date;
+  createdAt: Date;
 }
 
 export interface HistoryDocument {

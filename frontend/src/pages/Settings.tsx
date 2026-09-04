@@ -91,7 +91,7 @@ export default function Settings() {
           )}
         </div>
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="self-start sm:self-auto shrink-0">{children}</div>
     </div>
   );
 
@@ -140,7 +140,7 @@ export default function Settings() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
-            <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden sticky top-[88px]">
+            <div className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden lg:sticky lg:top-[88px]">
               <button
                 onClick={() => setActiveTab("playback")}
                 className={`w-full px-4 py-3 text-left font-medium transition flex items-center gap-3 ${
@@ -178,7 +178,7 @@ export default function Settings() {
           </div>
 
           {/* Content Area */}
-          <div className="lg:col-span-3">
+          <div className="min-w-0 lg:col-span-3">
             <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
               {/* Playback Settings */}
               {activeTab === "playback" && (

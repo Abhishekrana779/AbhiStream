@@ -47,7 +47,7 @@ export default function AnimeCard({ anime }: Props) {
         )}
 
         {/* Watch button */}
-        <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition duration-300">
+        <div className="absolute bottom-2 left-2 right-2 opacity-100 transition duration-300 sm:opacity-0 sm:group-hover:opacity-100">
           <div className="relative group/btn">
             <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-600 to-pink-500 blur-lg opacity-60 group-hover/btn:opacity-100 transition" />
             <div className="relative bg-gradient-to-r from-purple-600 to-pink-500 text-white text-center text-xs sm:text-sm font-bold py-2 rounded-lg hover:shadow-lg hover:shadow-purple-500/50 transition">

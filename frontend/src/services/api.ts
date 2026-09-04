@@ -3,12 +3,6 @@ import type { ApiResponse } from "../types/anime";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-if (!API_BASE_URL) {
-  console.warn(
-    "VITE_API_URL is not set. Falling back to '/api'. This will only work when a reverse proxy is configured (local dev). On Render static sites, set VITE_API_URL to your backend URL.",
-  );
-}
-
 const api = axios.create({
   baseURL: API_BASE_URL || "/api",
   timeout: 15000,

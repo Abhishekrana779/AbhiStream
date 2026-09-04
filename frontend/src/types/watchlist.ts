@@ -5,5 +5,5 @@ export interface WatchlistItem {
   title: string;
   poster: string;
   status: string | null;
-  addedAt: string;
+  createdAt: string;
 }

@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: abhistream-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGO_URI
+        sync: false
+      - key: CLIENT_URL
+        value: https://abhistream-009.onrender.com
+      - key: ALLOWED_ORIGINS
+        value: https://abhistream.onrender.com,http://localhost:5173,http://localhost:3000
+      - key: MIRURO_API_URL
+        value: https://mirurotvapi.vercel.app/api
+      # Set in Render dashboard → abhistream-backend → Environment.
+      # Required for Watch-page playback; see docs/MIRURO_STREAMING.md.
+      # Must point at a self-hosted Miruro-API on a residential/VPS IP.
+      - key: STREAM_API_URL
+        sync: false
+
+  - type: static_site
+    name: abhistream-frontend
+    rootDir: frontend
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    rewrites:
+      - source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://abhistream-backend.onrender.com/api

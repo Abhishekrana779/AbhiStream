@@ -148,13 +148,6 @@ export async function getEpisodeLinks(req: Request, res: Response): Promise<void
     const categoryRaw = typeof req.query.category === "string" ? req.query.category : "sub";
     const category: "sub" | "dub" = categoryRaw === "dub" ? "dub" : "sub";
     const data = await miruroClient.getEpisodeLinks(id, episodeNumber, category);
-    if (data.sources.length === 0) {
-      res.status(404).json({
-        success: false,
-        message: "No sources available for this episode",
-      });
-      return;
-    }
     const response: ApiResponse<typeof data> = { success: true, data };
     res.json(response);
   } catch (error) {
@@ -231,34 +224,59 @@ function isPlaylist(target: string, contentType?: string): boolean {
   );
 }
 
+function isPrivateIPv4(host: string): boolean {
+  const parts = host.split(".").map((p) => Number.parseInt(p, 10));
+  if (parts.length !== 4 || !parts.every((p) => Number.isFinite(p) && p >= 0 && p <= 255)) {
+    return false;
+  }
+  const [a, b] = parts;
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 127) return true;
+  if (a === 0) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
+function isPrivateIPv6(host: string): boolean {
+  const lower = host.toLowerCase();
+  if (lower === "::1" || lower === "::") return true;
+  if (lower.startsWith("fc") || lower.startsWith("fd")) return true;
+  if (lower.startsWith("fe80:") || lower.startsWith("fe8") ||
+      lower.startsWith("fe9") || lower.startsWith("fea") || lower.startsWith("feb")) {
+    return true;
+  }
+  if (lower.startsWith("::ffff:")) {
+    const mapped = lower.slice(7);
+    if (isPrivateIPv4(mapped)) return true;
+    if (mapped.startsWith("127.")) return true;
+  }
+  return false;
+}
+
 function isSafeProxyTarget(target: string): boolean {
   try {
     const u = new URL(target);
     if (u.protocol !== "http:" && u.protocol !== "https:") return false;
-    const host = u.hostname.toLowerCase();
+    let host = u.hostname.toLowerCase();
+    if (host.startsWith("[") && host.endsWith("]")) {
+      host = host.slice(1, -1);
+    }
     if (
       host === "localhost" ||
       host === "127.0.0.1" ||
-      host === "::1" ||
       host === "0.0.0.0" ||
       host.endsWith(".local") ||
       host.endsWith(".internal")
     ) {
       return false;
     }
-    const parts = host.split(".").map((p) => Number.parseInt(p, 10));
-    if (
-      parts.length === 4 &&
-      parts.every((p) => Number.isFinite(p) && p >= 0 && p <= 255)
-    ) {
-      if (
-        parts[0] === 10 ||
-        (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-        (parts[0] === 192 && parts[1] === 168) ||
-        parts[0] === 169 && parts[1] === 254
-      ) {
-        return false;
-      }
+    if (host.includes(":")) {
+      if (isPrivateIPv6(host)) return false;
+    } else {
+      if (isPrivateIPv4(host)) return false;
     }
     return true;
   } catch {
@@ -283,11 +301,17 @@ function mapContentType(target: string, contentType?: string): string {
   if (/\.m4s($|;|\?)/i.test(target)) return "video/mp4";
   if (/\.aac($|;|\?)/i.test(target)) return "audio/aac";
   if (/\.key($|;|\?)/i.test(target)) return "application/octet-stream";
-  if (contentType && /image\/jpeg/.test(contentType)) {
-    return "video/mp2t";
-  }
   if (contentType) return contentType;
   return "application/octet-stream";
+}
+
+function getOriginFromReferer(referer?: string): string | undefined {
+    if (!referer) return undefined;
+    try {
+        return new URL(referer).origin;
+    } catch {
+        return undefined;
+    }
 }
 
 function buildProxyUrl(target: string, referer?: string): string {
@@ -346,9 +370,20 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
     const upstreamHeaders: Record<string, string> = {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-      Accept: "*/*",
+      "Accept": "*/*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Sec-Fetch-Dest": "empty",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Site": "cross-site",
+      "sec-ch-ua": '"Chromium";v="120.0.0.0", "Google Chrome";v="120.0.0.0", "Not-A/Brand";v="8.0.0"',
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": '"Windows"',
     };
-    if (referer) upstreamHeaders.Referer = referer;
+    if (referer) {
+      upstreamHeaders.Referer = referer;
+      const origin = getOriginFromReferer(referer);
+      if (origin) upstreamHeaders.Origin = origin;
+    }
     if (req.headers.range) upstreamHeaders.Range = String(req.headers.range);
     if (req.headers["if-range"]) upstreamHeaders["If-Range"] = String(req.headers["if-range"]);
 
@@ -361,29 +396,53 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
       validateStatus: (status) => status < 500,
     });
 
+    const onResponseClose = (): void => {
+      controller.abort();
+      upstream.data.destroy();
+    };
+
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
     res.setHeader("Accept-Ranges", "bytes");
+
+    if (upstream.status >= 400) {
+      const message = `Upstream returned ${upstream.status}`;
+      let detail = "";
+      if (upstream.status === 403) {
+        detail = " — the CDN rejected the request. This usually means the source URL has expired or the referer is blocked.";
+      }
+      if (upstream.status === 410) {
+        detail = " — the upstream resource is gone. The stream URL has likely expired and is no longer available.";
+      }
+      if (!res.headersSent) {
+        res.status(upstream.status);
+        res.setHeader("Content-Type", "application/json");
+        res.json({ success: false, message: message + detail });
+      }
+      req.off("close", onClientClose);
+      res.off("close", onResponseClose);
+      return;
+    }
 
     const contentType = upstream.headers["content-type"] as string | undefined;
 
     if (isPlaylist(target, contentType)) {
       const chunks: Buffer[] = [];
       upstream.data.on("data", (chunk: Buffer) => chunks.push(chunk));
-      let readTimer: ReturnType<typeof setTimeout>;
+      let readTimer: ReturnType<typeof setTimeout> | undefined;
       await new Promise<void>((resolve, reject) => {
         readTimer = setTimeout(() => reject(new Error("manifest read timeout")), 15000);
         upstream.data.on("end", () => {
-          clearTimeout(readTimer);
+          clearTimeout(readTimer!);
           resolve();
         });
         upstream.data.on("error", (err: Error) => {
-          clearTimeout(readTimer);
+          clearTimeout(readTimer!);
           reject(err);
         });
         upstream.data.on("aborted", () => {
-          clearTimeout(readTimer);
+          clearTimeout(readTimer!);
           reject(new Error("manifest read aborted"));
         });
       });
@@ -392,6 +451,7 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
       res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
       res.status(upstream.status).send(rewritten);
       req.off("close", onClientClose);
+      res.off("close", onResponseClose);
       return;
     }
 
@@ -412,11 +472,10 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
       );
     }
     upstream.data.pipe(res);
-    upstream.data.on("error", () => res.end());
-    res.on("close", () => {
-      controller.abort();
-      upstream.data.destroy();
+    upstream.data.on("error", () => {
+      if (!res.writableEnded) res.end();
     });
+    res.on("close", onResponseClose);
   } catch (error: unknown) {
     const err = error as { response?: { status?: number }; code?: string };
     if (err?.code === "ERR_CANCELED" || (error as Error)?.name === "CanceledError") {
@@ -429,5 +488,7 @@ export async function proxyStream(req: Request, res: Response): Promise<void> {
     if (!res.headersSent) {
       res.status(status).json({ success: false, message });
     }
+  } finally {
+    req.removeAllListeners("close");
   }
 }

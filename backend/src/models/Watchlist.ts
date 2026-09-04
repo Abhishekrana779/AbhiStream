@@ -6,7 +6,7 @@ export interface IWatchlist extends Document {
   title: string;
   poster: string;
   status: string | null;
-  addedAt: Date;
+  createdAt: Date;
 }
 
 const watchlistSchema = new Schema<IWatchlist>(

@@ -11,21 +11,23 @@ import { notFoundMiddleware } from "./middleware/notFoundMiddleware";
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     const allowed = [env.CLIENT_URL, ...env.ALLOWED_ORIGINS].filter(Boolean);
-    if (allowed.includes("*") || allowed.includes(origin)) {
+    if (allowed.includes(origin)) {
       return callback(null, true);
     }
-    return callback(new Error(`CORS not allowed for origin: ${origin}`), false);
+    return callback(null, false);
   },
   credentials: true,
 }));
 
 app.use(express.json({ limit: "10mb" }));
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 app.get("/api/health", (_req, res) => {
   res.json({ success: true, message: "AbhiStream API is running" });

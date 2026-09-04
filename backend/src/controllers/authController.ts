@@ -349,7 +349,7 @@ export async function uploadAvatar(
     const oldAvatar = user.avatar;
     if (oldAvatar && oldAvatar.startsWith("/uploads/")) {
       const relativePath = oldAvatar.startsWith("/") ? oldAvatar.slice(1) : oldAvatar;
-      const oldPath = path.join(process.cwd(), relativePath);
+      const oldPath = path.join(__dirname, "..", "..", relativePath);
       fs.unlink(oldPath).catch(() => {});
     }
 

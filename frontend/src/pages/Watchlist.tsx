@@ -210,7 +210,7 @@ export default function Watchlist() {
                 {/* Added Date */}
                 <p className="text-gray-400 text-xs flex items-center gap-1">
                   <FiCalendar className="w-3 h-3" />
-                  Added {formatDate(item.addedAt)}
+                   Added {formatDate(item.createdAt)}
                 </p>
               </div>
             </div>

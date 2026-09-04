@@ -51,7 +51,9 @@ export default function VideoPlayer({ streamingData, poster, autoPlay = true, on
           xhrSetup: (xhr) => {
             if (streamingData.headers) {
               Object.entries(streamingData.headers).forEach(([key, value]) => {
-                xhr.setRequestHeader(key, value);
+                if (key.toLowerCase() !== "referer") {
+                  xhr.setRequestHeader(key, value);
+                }
               });
             }
           },
@@ -198,7 +200,7 @@ export default function VideoPlayer({ streamingData, poster, autoPlay = true, on
 
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 px-4">
-          <p className="text-red-400 text-base sm:text-lg mb-2"></p>
+          <p className="text-red-400 text-base sm:text-lg mb-2">Playback Error</p>
           <p className="text-gray-300 text-xs sm:text-sm text-center">{error}</p>
         </div>
       )}

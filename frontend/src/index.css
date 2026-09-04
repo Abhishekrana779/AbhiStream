@@ -50,6 +50,25 @@
   }
 }
 
+@layer base {
+  html {
+    overflow-x: hidden;
+  }
+
+  body {
+    min-width: 320px;
+    overflow-x: hidden;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 @keyframes skeleton-shimmer {
   0% {
     background-position: 200% 0;

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "AbhiStream Anime Streaming Backend",
   "main": "dist/server.js",
+  "type": "commonjs",
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=4096 ts-node-dev --respawn --transpile-only src/server.ts",
     "dev:clean": "pkill -f 'src/server.ts' 2>/dev/null; sleep 1; NODE_OPTIONS=--max-old-space-size=4096 ts-node-dev --respawn --transpile-only src/server.ts",
@@ -30,5 +31,5 @@
     "typescript": "^5.4.5"
   },
   "keywords": [],
-  "type": "commonjs"
+  "license": "ISC"
 }

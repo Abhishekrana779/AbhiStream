@@ -49,6 +49,8 @@ export default function Watch() {
   const [streamingHeaders, setStreamingHeaders] = useState<
     Record<string, string>
   >({});
+  const [introSkip, setIntroSkip] = useState<{ start: number; end: number } | null>(null);
+  const [outroSkip, setOutroSkip] = useState<{ start: number; end: number } | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [trackType, setTrackType] = useState<TrackType>("sub");
   const [autoPlay, setAutoPlay] = useState(true);
@@ -99,11 +101,13 @@ export default function Watch() {
       setStreamingSources(streaming.sources);
       setStreamingHeaders(streaming.headers || {});
       setServers(streaming.servers || []);
+      setIntroSkip(streaming.intro || null);
+      setOutroSkip(streaming.outro || null);
 
       let nextSource: StreamingSource | null = streaming.sources[0] || null;
       if (!nextSource && anime?.externalStreams && anime.externalStreams.length > 0) {
         const ext = anime.externalStreams[0];
-        nextSource = { url: ext.url, isM3U8: false, quality: ext.site || "external" };
+        nextSource = { url: ext.url, isM3U8: /\.m3u8($|\?)/i.test(ext.url), quality: ext.site || "external" };
       }
       setSelectedQuality(nextSource);
       setActiveProvider(nextSource?.provider || streaming.servers?.[0]?.provider || null);
@@ -148,11 +152,13 @@ export default function Watch() {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
+
   const proxySource = (url: string): string => {
     const params = new URLSearchParams({ url });
     const referer = streamingHeaders?.Referer;
     if (referer) params.set("referer", referer);
-    return `/api/anime/stream?${params.toString()}`;
+    return `${API_BASE_URL}/anime/stream?${params.toString()}`;
   };
 
   const getAbsoluteProxyUrl = (url: string): string => {
@@ -165,6 +171,7 @@ export default function Watch() {
   };
 
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       if (!animeId || !episodeId) {
         setError("Episode not found");
@@ -178,6 +185,7 @@ export default function Watch() {
 
       try {
         const animeData = await animeApi.getInfo(animeId);
+        if (cancelled) return;
         setAnime(animeData);
 
         const allEpisodes = [
@@ -200,7 +208,10 @@ export default function Watch() {
           servers?: StreamingServer[];
         } = { sources: [], headers: {} };
         if (Number.isFinite(episodeNumber) && episodeNumber > 0) {
-          streaming = await fetchEpisodeSources(animeId, episodeNumber, "sub");
+          const initialCategory =
+            episode?.isDub && !episode?.isSub ? "dub" : "sub";
+          streaming = await fetchEpisodeSources(animeId, episodeNumber, initialCategory);
+          if (cancelled) return;
 
           fetchEpisodeSources(animeId, episodeNumber, "dub")
             .then((dubResult) => {
@@ -218,30 +229,48 @@ export default function Watch() {
           }
         }
 
+        if (streaming.sources.length === 0) {
+          setError("No streaming sources available for this episode.");
+        }
+
         applyStreamingToPlayer(streaming);
 
         if (episode) {
-          const historyItem = await historyApi.add({
-            animeId,
-            episodeId,
-            animeTitle: animeData.title,
-            episodeNumber: episode.number,
-            episodeTitle: episode.title,
-            poster: animeData.poster,
-            progress: 0,
-            duration: 0,
-            completed: false,
-          });
-          setHistoryId(historyItem._id);
+          try {
+            const historyItem = await historyApi.add({
+              animeId,
+              episodeId,
+              animeTitle: animeData.title,
+              episodeNumber: episode.number,
+              episodeTitle: episode.title,
+              poster: animeData.poster,
+              progress: 0,
+              duration: 0,
+              completed: false,
+            });
+            if (cancelled) return;
+            if (historyItem && typeof historyItem._id === "string") {
+              setHistoryId(historyItem._id);
+            }
+          } catch {
+            // Unauthenticated users get 401 — history tracking is silently skipped.
+          }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load episode");
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load episode");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [animeId, episodeId]);
 
   useEffect(() => {
@@ -280,9 +309,9 @@ export default function Watch() {
     video.load();
 
     let disposed = false;
-    if (selectedQuality.isM3U8) {
-      const absoluteSourceUrl = getAbsoluteProxyUrl(selectedQuality.url);
+    const absoluteSourceUrl = getAbsoluteProxyUrl(selectedQuality.url);
 
+    if (selectedQuality.isM3U8) {
       if (Hls.isSupported()) {
         const hls = new Hls({
           enableWorker: true,
@@ -299,13 +328,32 @@ export default function Watch() {
         hlsRef.current = hls;
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          if (!disposed && isPlayingRef.current) {
+          if (!disposed && (isPlayingRef.current || autoPlay)) {
             video.play().catch(() => {});
           }
         });
 
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (data.fatal) {
+            const httpStatus = data.httpStatusCode;
+            if (
+              data.type === Hls.ErrorTypes.NETWORK_ERROR &&
+              (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+                data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+                httpStatus === 403 ||
+                httpStatus === 410)
+            ) {
+              hls.destroy();
+              hlsRef.current = null;
+              setError(
+                httpStatus === 403
+                  ? "Stream access denied (403). The source URL may have expired or the CDN rejected the request. Try another server."
+                  : httpStatus === 410
+                    ? "Stream expired (410). The source URL is no longer available. Try switching to a different server or episode."
+                    : "Failed to load stream manifest. Please try another source.",
+              );
+              return;
+            }
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 hls.startLoad();
@@ -316,32 +364,54 @@ export default function Watch() {
               default:
                 hls.destroy();
                 hlsRef.current = null;
+                setError(data.error?.message || "Fatal playback error. Please try another source.");
                 break;
             }
           }
         });
+
+        return () => {
+          disposed = true;
+          hlsRef.current?.destroy();
+          hlsRef.current = null;
+          video.removeAttribute("src");
+          video.load();
+        };
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = absoluteSourceUrl;
-        video.addEventListener("loadedmetadata", () => {
-          if (!disposed && isPlayingRef.current) {
-            video.play().catch(() => {});
-          }
-        }, { once: true });
+        const onMeta = () => {
+          if (!disposed && (isPlayingRef.current || autoPlay)) video.play().catch(() => {});
+        };
+        video.addEventListener("loadedmetadata", onMeta, { once: true });
+        return () => {
+          disposed = true;
+          video.removeEventListener("loadedmetadata", onMeta);
+          video.removeAttribute("src");
+          video.load();
+        };
       }
-
-      return () => {
-        disposed = true;
-        hlsRef.current?.destroy();
-        hlsRef.current = null;
-      };
     }
 
-    video.src = getAbsoluteProxyUrl(selectedQuality.url);
+    video.src = absoluteSourceUrl;
+    video.load();
+    const onLoaded = () => {
+      if (!disposed && (isPlayingRef.current || autoPlay)) video.play().catch(() => {});
+    };
+    const onError = () => {
+      if (!disposed) {
+        setError("Failed to load video source. Please try another source.");
+      }
+    };
+    video.addEventListener("loadeddata", onLoaded, { once: true });
+    video.addEventListener("error", onError, { once: true });
     return () => {
+      disposed = true;
+      video.removeEventListener("loadeddata", onLoaded);
+      video.removeEventListener("error", onError);
       video.removeAttribute("src");
       video.load();
     };
-  }, [selectedQuality, streamingHeaders]);
+  }, [selectedQuality, streamingHeaders, autoPlay]);
 
   useEffect(() => {
     if (!historyId) return;
@@ -350,6 +420,7 @@ export default function Watch() {
     let consecutiveFailures = 0;
     let inFlight = false;
     let lastSentProgress = -1;
+    let backoffTimer: ReturnType<typeof setTimeout> | null = null;
 
     const tick = async () => {
       if (cancelled || inFlight) return;
@@ -373,18 +444,22 @@ export default function Watch() {
       }
     };
 
-    const interval = setInterval(() => {
+    const schedule = (): void => {
+      if (cancelled) return;
       if (consecutiveFailures >= 3) return;
-      if (consecutiveFailures > 0) {
-        setTimeout(tick, 2000 * consecutiveFailures);
-      } else {
+      const delay = consecutiveFailures > 0 ? 2000 * consecutiveFailures : 10000;
+      backoffTimer = setTimeout(() => {
+        backoffTimer = null;
         void tick();
-      }
-    }, 10000);
+        schedule();
+      }, delay);
+    };
+
+    schedule();
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (backoffTimer) clearTimeout(backoffTimer);
     };
   }, [historyId]);
 
@@ -407,6 +482,7 @@ export default function Watch() {
     };
 
     const handleSeeked = () => {
+      seekingRef.current = false;
       if (wasPlayingBeforeSeekRef.current) {
         video.play().catch(() => {});
         wasPlayingBeforeSeekRef.current = false;
@@ -443,6 +519,7 @@ export default function Watch() {
     const video = videoRef.current;
     if (!video) return;
     wasPlayingBeforeSeekRef.current = !video.paused;
+    seekingRef.current = true;
     video.currentTime = Math.max(0, video.currentTime - 15);
   }, []);
 
@@ -450,6 +527,7 @@ export default function Watch() {
     const video = videoRef.current;
     if (!video) return;
     wasPlayingBeforeSeekRef.current = !video.paused;
+    seekingRef.current = true;
     video.currentTime = Math.min(duration, video.currentTime + 15);
   }, [duration]);
 
@@ -549,18 +627,23 @@ export default function Watch() {
     const video = videoRef.current;
     if (!video || !autoSkip) return;
 
-    let applied = false;
+    const introApplied = { current: false };
+    const outroApplied = { current: false };
+
     const handleTimeUpdate = () => {
-      if (applied) return;
-      if (video.currentTime < 30 && video.currentTime > 0) {
-        applied = true;
-        video.currentTime = 30;
+      if (introSkip && !introApplied.current && video.currentTime >= introSkip.start && video.currentTime < introSkip.end) {
+        introApplied.current = true;
+        video.currentTime = introSkip.end;
+      }
+      if (outroSkip && !outroApplied.current && video.currentTime >= outroSkip.start) {
+        outroApplied.current = true;
+        goToNextEpisode();
       }
     };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
     return () => video.removeEventListener("timeupdate", handleTimeUpdate);
-  }, [autoSkip]);
+  }, [autoSkip, introSkip, outroSkip, episodeId]);
 
   useEffect(() => {
     if (!lightsOff) return;
@@ -594,12 +677,16 @@ export default function Watch() {
           e.preventDefault();
           handlePlayPause();
           break;
-        case "ArrowLeft":
+      case "ArrowLeft":
           e.preventDefault();
+          wasPlayingBeforeSeekRef.current = !video.paused;
+          seekingRef.current = true;
           video.currentTime = Math.max(0, video.currentTime - 15);
           break;
         case "ArrowRight":
           e.preventDefault();
+          wasPlayingBeforeSeekRef.current = !video.paused;
+          seekingRef.current = true;
           video.currentTime = Math.min(dur, video.currentTime + 15);
           break;
         case "ArrowUp":
@@ -704,7 +791,6 @@ export default function Watch() {
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onEnded={() => autoNext && goToNextEpisode()}
-                crossOrigin="anonymous"
                 playsInline
                 preload="auto"
               />
@@ -841,7 +927,9 @@ export default function Watch() {
                             value={s.provider}
                             className="bg-dark-800"
                           >
-                            {favoriteServers.has(s.provider) ? "" : ""}{s.label}
+                            {favoriteServers.has(s.provider)
+                              ? `★ ${s.label}`
+                              : s.label}
                           </option>
                         ))}
                       </select>

@@ -516,6 +516,9 @@ export const miruroClient = {
       };
 
       if (!env.STREAM_API_URL) {
+        if (env.NODE_ENV === "production") {
+          return empty;
+        }
         try {
           const { data } = await anilist.post<AniListResponse<{ Media: AniListMedia }>>("", {
             query: EPISODES_QUERY,
@@ -553,70 +556,75 @@ export const miruroClient = {
         }
       }
 
-      const base = env.STREAM_API_URL.replace(/\/$/, "");
-      const providers = ["anikoto", "hianime", "anineko", "animegg", "reanime"];
+      const base = env.STREAM_API_URL.replace(/\/+$/, "");
+      const joinUrl = (path: string): string => {
+        const cleaned = path.replace(/^\/+/, "");
+        return `${base}/${cleaned}`.replace(/([^:])\/+/g, "$1/");
+      };
+      type StreamEpisodeT = { id?: string; number?: number };
+      type StreamProviderT = {
+        episodes?: { sub?: StreamEpisodeT[]; dub?: StreamEpisodeT[] };
+      };
+      type StreamsResponseT = {
+        streams?: Array<{ url: string; type?: string; quality?: string; referer?: string }>;
+        intro?: { start: number; end: number };
+        outro?: { start: number; end: number };
+        subtitles?: Array<{ url?: string; file?: string; label?: string; lang?: string }>;
+      };
 
-      const results = await Promise.allSettled(
-        providers.map(async (provider) => {
-          const url = `${base}/watch/${provider}/${anilistId}/${category}/${provider}-${episodeNumber}`;
-          const { data } = await axios.get<any>(url, { timeout: 20000 });
-          if (!data || typeof data !== "object") return null;
+      // Miruro returns provider-specific episode IDs from /episodes. Those IDs
+      // are deliberately not predictable (for example, kiwi uses animepahe-1),
+      // so constructing a provider-episode URL produces only 404 responses.
+      const { data: episodes } = await axios.get<{ providers?: Record<string, StreamProviderT> }>(
+        joinUrl(`/episodes/${encodeURIComponent(anilistId)}`),
+        { timeout: 20000 },
+      );
+      const candidates = Object.entries(episodes?.providers || {})
+        .map(([provider, data]) => ({
+          provider,
+          episode: data.episodes?.[category]?.find(
+            (episode) => Number(episode.number) === episodeNumber,
+          ),
+        }))
+        .filter(
+          (candidate): candidate is { provider: string; episode: StreamEpisodeT & { id: string } } =>
+            typeof candidate.episode?.id === "string" && candidate.episode.id.length > 0,
+        );
 
-          // Standard Anivexa shape: { ssub: { streams, intro, outro }, sdub: {...} }
-          let container: {
-            streams?: Array<{ url: string; type?: string; referer?: string }>;
-            intro?: { start: number; end: number };
-            outro?: { start: number; end: number };
-            subtitles?: Array<{ url?: string; file?: string; label?: string; lang?: string }>;
-          } | null = null;
-          if (category === "dub") {
-            container = data?.sdub || data?.dub || null;
-          } else {
-            container = data?.ssub || data?.sub || null;
-          }
-
-          // Alternative shape (e.g. animegg): { streams: [...], title, ... }
-          if (!container && Array.isArray(data?.streams)) {
-            container = {
-              streams: data.streams,
-              intro: data.intro,
-              outro: data.outro,
-              subtitles: data.subtitles,
-            };
-          }
-
-          const streams = container?.streams || [];
-          const hls = streams.find((s) => s.type === "hls" || /\.m3u8($|\?)/i.test(s.url));
+      const settled = await Promise.allSettled(
+        candidates.map(async ({ provider, episode }) => {
+          // Episode IDs are API paths such as "watch/kiwi/...". Resolve them
+          // against the configured stream service rather than guessing a slug.
+          const url = joinUrl(episode.id);
+          const { data } = await axios.get<StreamsResponseT>(url, { timeout: 25000 });
+          const streams = data?.streams || [];
+          const hls = streams.find((stream) => stream.type === "hls" || /\.m3u8($|\?)/i.test(stream.url));
           const chosen = hls || streams[0];
           if (!chosen?.url) return null;
           return {
             provider,
             label: providerLabel(provider),
             url: chosen.url,
-            isM3U8: /\.m3u8($|\?)/i.test(chosen.url),
-            quality: provider,
+            isM3U8: chosen.type === "hls" || /\.m3u8($|\?)/i.test(chosen.url),
+            quality: chosen.quality || provider,
             referer: chosen.referer,
-            intro: container?.intro,
-            outro: container?.outro,
-            subtitles: container?.subtitles || [],
+            intro: data.intro,
+            outro: data.outro,
+            subtitles: data.subtitles || [],
           };
         }),
       );
 
-      const servers = results
+      const allServers = settled
         .map((r) => (r.status === "fulfilled" ? r.value : null))
         .filter((s): s is NonNullable<typeof s> => Boolean(s))
         .map((s) => ({ ...s, working: true }));
 
-      if (servers.length === 0) {
+      if (allServers.length === 0) {
         return empty;
       }
 
-      // Pick the first working provider (preferring anikoto > hianime > others).
-      const order = ["anikoto", "hianime", "anineko", "animegg", "reanime"];
-      const primary = order
-        .map((p) => servers.find((s) => s.provider === p))
-        .find(Boolean) || servers[0];
+      const primary = allServers[0];
 
       return {
         sources: [
@@ -632,7 +640,7 @@ export const miruroClient = {
         intro: primary.intro,
         outro: primary.outro,
         subtitles: primary.subtitles,
-        servers,
+        servers: allServers,
       };
     });
   },

@@ -2,7 +2,8 @@
   "name": "abhistream",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix backend\" \"bash -c 'until curl -s http://localhost:5000/api/health > /dev/null; do sleep 1; done; npm run dev --prefix frontend'\"",
+    "dev": "concurrently \"npm run stream\" \"npm run dev --prefix backend\" \"bash -c 'until curl -s http://localhost:5000/api/health > /dev/null; do sleep 1; done; npm run dev --prefix frontend'\"",
+    "stream": "python3 -m uvicorn api:app --app-dir Miruro-API --host 127.0.0.1 --port 8000",
     "backend": "npm run dev --prefix backend",
     "frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend && npm run build --prefix backend"

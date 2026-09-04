@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { FiBookmark, FiCheck } from "react-icons/fi";
 import { useWatchlist } from "../context/WatchlistContext";
 import { useAuth } from "../hooks/useAuth";
@@ -23,8 +23,11 @@ export default function WatchlistButton({
   const { isInWatchlist, addToWatchlist, removeFromWatchlist } = useWatchlist();
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const inListRef = useRef(isInWatchlist(animeId));
 
-  const inList = isInWatchlist(animeId);
+  useEffect(() => {
+    inListRef.current = isInWatchlist(animeId);
+  }, [isInWatchlist, animeId]);
 
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -37,7 +40,7 @@ export default function WatchlistButton({
 
     setLoading(true);
     try {
-      if (inList) {
+      if (inListRef.current) {
         await removeFromWatchlist(animeId);
       } else {
         await addToWatchlist(animeId, title, poster, status);
@@ -63,24 +66,24 @@ export default function WatchlistButton({
 
   return (
     <div className="relative group">
-      {!inList && (
+      {!inListRef.current && (
         <div className="absolute -inset-1 rounded-lg bg-gradient-to-r from-purple-600/50 to-pink-500/50 blur opacity-0 group-hover:opacity-75 transition duration-300" />
       )}
       <button
         onClick={handleClick}
         disabled={loading}
         className={`relative rounded-lg font-semibold transition duration-300 flex items-center ${sizeClasses[size]} ${
-          inList
+          inListRef.current
             ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/50"
             : "bg-dark-600 text-white border border-purple-500/30 hover:border-purple-500/60 hover:bg-dark-500"
         } disabled:opacity-50`}
       >
-        {inList ? (
+        {inListRef.current ? (
           <FiCheck className={iconSize[size]} />
         ) : (
           <FiBookmark className={iconSize[size]} />
         )}
-        {inList ? "In Watchlist" : "Watchlist"}
+        {inListRef.current ? "In Watchlist" : "Watchlist"}
       </button>
     </div>
   );
