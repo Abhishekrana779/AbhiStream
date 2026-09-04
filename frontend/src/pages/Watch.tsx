@@ -335,7 +335,7 @@ export default function Watch() {
 
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (data.fatal) {
-            const httpStatus = data.httpStatusCode;
+            const httpStatus = data.response?.code;
             if (
               data.type === Hls.ErrorTypes.NETWORK_ERROR &&
               (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
