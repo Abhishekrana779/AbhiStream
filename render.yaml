@@ -15,9 +15,9 @@ services:
       - key: MONGO_URI
         sync: false
       - key: CLIENT_URL
-        value: https://abhistream-009.onrender.com
+        value: https://abhistream-frontend.onrender.com
       - key: ALLOWED_ORIGINS
-        value: https://abhistream.onrender.com,http://localhost:5173,http://localhost:3000
+        value: https://abhistream-frontend.onrender.com,http://localhost:5173,http://localhost:3000
       - key: MIRURO_API_URL
         value: https://mirurotvapi.vercel.app/api
       # Set in Render dashboard → abhistream-backend → Environment.
