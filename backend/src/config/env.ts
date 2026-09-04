@@ -34,9 +34,12 @@ if (!mongoUri) {
   process.exit(1);
 }
 
-const miruroApiUrl =
-  process.env.MIRURO_API_URL?.trim() ||
-  "https://mirurotvapi.vercel.app/api";
+const miruroApiUrl = process.env.MIRURO_API_URL?.trim();
+
+if (!miruroApiUrl) {
+  console.error("FATAL: MIRURO_API_URL is not set.");
+  process.exit(1);
+}
 
 const streamApiUrl =
   process.env.STREAM_API_URL?.trim() ||
