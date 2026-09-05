@@ -213,6 +213,12 @@ export default function Watch() {
           streaming = await fetchEpisodeSources(animeId, episodeNumber, initialCategory);
           if (cancelled) return;
 
+          if (streaming.sources.length === 0) {
+            const altCategory = initialCategory === "dub" ? "sub" : "dub";
+            streaming = await fetchEpisodeSources(animeId, episodeNumber, altCategory);
+            if (cancelled) return;
+          }
+
           fetchEpisodeSources(animeId, episodeNumber, "dub")
             .then((dubResult) => {
               setDubAvailable(dubResult.sources.length > 0);
@@ -280,16 +286,27 @@ export default function Watch() {
 
     let cancelled = false;
     (async () => {
-      const streaming = await fetchEpisodeSources(animeId, episodeNumber, trackType);
+      let streaming = await fetchEpisodeSources(animeId, episodeNumber, trackType);
       if (cancelled) return;
+
+      if (streaming.sources.length === 0 && trackType === "dub") {
+        streaming = await fetchEpisodeSources(animeId, episodeNumber, "sub");
+        if (cancelled) return;
+      }
+
+      if (streaming.sources.length === 0) {
+        try {
+          const fallback = await animeApi.getStreamingSources(episodeId);
+          streaming = { ...streaming, sources: fallback.sources, headers: fallback.headers };
+        } catch {
+          // ignore
+        }
+      }
+
       if (streaming.sources.length > 0) {
         setError(null);
         applyStreamingToPlayer(streaming);
       } else {
-        if (trackType === "dub") {
-          setTrackType("sub");
-          return;
-        }
         setError("No sources available for this language");
       }
     })();

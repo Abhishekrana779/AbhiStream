@@ -25,7 +25,8 @@ export const animeApi = {
   search: (q: string, page: number = 1) =>
     apiGet<PaginatedAnime>("/anime/search", { q, page }),
 
-  getInfo: (id: string) => apiGet<AnimeDetails>(`/anime/${id}`),
+  getInfo: (id: string) =>
+    apiGet<AnimeDetails>(`/anime/${id}`),
 
   getStreamingSources: (episodeId: string) =>
     apiGet<StreamingData>(`/anime/${episodeId}/streaming`),
@@ -36,7 +37,8 @@ export const animeApi = {
       category,
     }),
 
-  getGenres: () => apiGet<Genre[]>("/anime/genres"),
+  getGenres: () =>
+    apiGet<Genre[]>("/anime/genres"),
 
   getGenreAnime: (genreId: string, page: number = 1) =>
     apiGet<PaginatedAnime>(`/anime/genre/${genreId}`, { page }),

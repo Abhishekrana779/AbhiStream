@@ -1,0 +1,4 @@
+[submodule "Miruro-API"]
+	path = Miruro-API
+	url = https://github.com/walterwhite-69/Miruro-API.git
+	branch = main

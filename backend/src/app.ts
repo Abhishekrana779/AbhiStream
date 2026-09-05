@@ -13,17 +13,31 @@ const app = express();
 
 app.set("trust proxy", 1);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const allowed = [env.CLIENT_URL, ...env.ALLOWED_ORIGINS].filter(Boolean);
-    if (allowed.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(null, false);
-  },
-  credentials: true,
-}));
+const LOCALHOST_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      const allowed = [
+        env.CLIENT_URL,
+        ...env.ALLOWED_ORIGINS,
+        ...LOCALHOST_ORIGINS,
+      ].filter(Boolean);
+
+      if (allowed.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(null, false);
+    },
+    credentials: true,
+  })
+);
 
 app.use(express.json({ limit: "10mb" }));
 

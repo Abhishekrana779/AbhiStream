@@ -51,12 +51,12 @@ const clientUrl =
 
 const allowedOrigins = parseOrigins(
   process.env.ALLOWED_ORIGINS,
-  isProduction ? [] : defaultOrigins
+  defaultOrigins
 );
 
-if (isProduction && !clientUrl) {
+if (!clientUrl) {
   console.warn(
-    "WARN: CLIENT_URL is not set in production. CORS may block frontend requests."
+    "WARN: CLIENT_URL is not set. CORS may block frontend requests."
   );
 }
 

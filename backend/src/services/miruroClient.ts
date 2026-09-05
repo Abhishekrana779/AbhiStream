@@ -7,6 +7,7 @@ import type {
   Episode,
   ExternalStream,
   Genre,
+  MiruroWatchResponse,
   PaginatedAnime,
   StreamingData,
   StreamingSource,
@@ -348,6 +349,10 @@ function makeEpisodeId(anilistId: string, number: number): string {
   return `${anilistId}:${number}`;
 }
 
+function toWatchPath(episodeId: string): string {
+  return "/watch/" + episodeId.split(":").join("/");
+}
+
 function buildEpisodesFromAniList(
   anilistId: string,
   totalEpisodes: number | null | undefined,
@@ -488,15 +493,60 @@ export const miruroClient = {
     });
   },
 
-  async getStreamingSources(_episodeId: string): Promise<StreamingData> {
-    return {
-      sources: [],
-      download: "",
-      headers: {},
-      intro: undefined,
-      outro: undefined,
-      subtitles: [],
+  async getStreamingSources(episodeId: string): Promise<StreamingData> {
+    const base = env.STREAM_API_URL.replace(/\/+$/, "");
+    const joinUrl = (path: string): string => {
+      const cleaned = path.replace(/^\/+/, "");
+      return `${base}/${cleaned}`.replace(/([^:])\/+/g, "$1/");
     };
+
+    try {
+      const { data } = await axios.get<MiruroWatchResponse>(
+        joinUrl(toWatchPath(episodeId)),
+        { timeout: 15000 },
+      );
+
+      const streams = data.streams || [];
+      const sources = streams.map((s) => ({
+        url: s.url,
+        isM3U8: s.isM3U8 ?? s.type === "hls",
+        quality: s.quality || s.server || "unknown",
+      }));
+
+      const defaultStream =
+        streams.find((s) => s.default || s.isActive) || streams[0];
+      const headers: Record<string, string> = {};
+      if (defaultStream?.referer) {
+        headers.Referer = defaultStream.referer;
+      }
+
+      if (sources.length === 0 && data.sources) {
+        return {
+          sources: data.sources.map((s) => ({
+            url: s.url,
+            isM3U8: s.isM3U8,
+            quality: s.quality,
+          })),
+          download: data.download || "",
+          headers,
+        };
+      }
+
+      return {
+        sources,
+        download: data.download || "",
+        headers,
+      };
+    } catch {
+      return {
+        sources: [],
+        download: "",
+        headers: {},
+        intro: undefined,
+        outro: undefined,
+        subtitles: [],
+      };
+    }
   },
 
   async getEpisodeLinks(
@@ -575,10 +625,19 @@ export const miruroClient = {
       // Miruro returns provider-specific episode IDs from /episodes. Those IDs
       // are deliberately not predictable (for example, kiwi uses animepahe-1),
       // so constructing a provider-episode URL produces only 404 responses.
-      const { data: episodes } = await axios.get<{ providers?: Record<string, StreamProviderT> }>(
-        joinUrl(`/episodes/${encodeURIComponent(anilistId)}`),
-        { timeout: 20000 },
-      );
+      let episodes: { providers?: Record<string, StreamProviderT> };
+      try {
+        const response = await axios.get<{ providers?: Record<string, StreamProviderT> }>(
+          joinUrl(`/episodes/${encodeURIComponent(anilistId)}`),
+          { timeout: 20000 },
+        );
+        episodes = response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response && error.response.status < 500) {
+          return empty;
+        }
+        throw error;
+      }
       const candidates = Object.entries(episodes?.providers || {})
         .map(([provider, data]) => ({
           provider,
